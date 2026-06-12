@@ -1,5 +1,6 @@
 import { getMatches, getOdds } from '@/lib/data-sources';
 import { OddsForm } from '@/components/OddsForm';
+import { BetmanImport } from '@/components/BetmanImport';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { buildMatchOptions } from '@/lib/teams/options';
 import { toKoreanTeam } from '@/lib/teams/korea';
@@ -47,6 +48,8 @@ export default async function OddsPage() {
         정산은 베팅 시 입력한 배당으로 계산되니, 실제 베팅은 베트맨 배당을 직접 입력(또는 베팅 등록 시 수정)하세요.
         수동 입력값이 항상 우선합니다.
       </p>
+
+      <BetmanImport />
 
       <OddsForm matches={options} />
 

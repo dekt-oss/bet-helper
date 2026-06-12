@@ -5,7 +5,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parseBetmanOdds, matchOddsToMatches } from './betman';
+import {
+  parseBetmanOdds,
+  matchOddsToMatches,
+  parseBetmanGameSlip,
+} from './betman';
 import type { Match } from '@/lib/types';
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
@@ -54,4 +58,33 @@ test('matchOddsToMatches 는 한↔영 별칭으로 matchId 를 보정한다', a
   const matched = matchOddsToMatches(odds, matches);
   const kor = matched.find((o) => o.externalRef === '대한민국|브라질');
   assert.equal(kor?.matchId, 'wc2026-42');
+});
+
+test('parseBetmanGameSlip: 축구 월드컵 승무패만 추출하고 승/무/패 매핑', async () => {
+  const sample = {
+    compSchedules: {
+      keys: ['itemCode', 'gameName', 'homeName', 'awayName', 'winAllot', 'drawAllot', 'loseAllot', 'betTypNm'],
+      datas: [
+        ['SC', '축구 월드컵', '한국', '체코', 2.34, 3.0, 2.85, '승무패'],
+        ['SC', '축구 월드컵', '브라질', '모로코', 1.62, 3.4, 5.0, '승무패'],
+        ['BS', 'MLB', '볼티모어', '샌디에이고', 1.58, 0, 1.99, '일반 승패'],
+        ['SC', '축구 월드컵', '한국', '체코', 4.8, 3.7, 1.52, '승무패'],
+      ],
+    },
+  };
+  const odds = parseBetmanGameSlip(JSON.stringify(sample));
+  // 야구 행 제외 → 축구 3행. 단 betman-한국-체코 가 2개라 같은 matchId.
+  const kor = odds.find((o) => o.externalRef === '한국|체코');
+  assert.ok(kor);
+  assert.equal(kor.home, 2.34);
+  assert.equal(kor.draw, 3.0);
+  assert.equal(kor.away, 2.85);
+  assert.equal(kor.source, 'betman');
+  assert.ok(odds.every((o) => o.source === 'betman'));
+  assert.ok(!odds.some((o) => o.externalRef?.includes('볼티모어')));
+});
+
+test('parseBetmanGameSlip: 잘못된 입력은 [] 반환', () => {
+  assert.deepEqual(parseBetmanGameSlip('not json'), []);
+  assert.deepEqual(parseBetmanGameSlip('{}'), []);
 });
