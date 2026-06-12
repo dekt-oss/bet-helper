@@ -2,6 +2,7 @@ import { listBets, summarize } from '@/lib/bets/store';
 import { getMatches, getOdds } from '@/lib/data-sources';
 import { BetForm, type MatchOption, type OddsTriple } from '@/components/BetForm';
 import { SettleBet } from '@/components/SettleBet';
+import { AutoRefresh } from '@/components/AutoRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,7 +50,18 @@ export default async function BetsPage() {
 
   return (
     <>
-      <h1>베팅내역</h1>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+        }}
+      >
+        <h1 style={{ marginBottom: 4 }}>베팅내역</h1>
+        <AutoRefresh />
+      </div>
       <p className="muted">
         총 {stats.count}건 · 베팅액 {won(stats.totalStake)} · 수령{' '}
         {won(stats.totalPayout)} · 손익{' '}
@@ -81,8 +93,13 @@ export default async function BetsPage() {
             <tbody>
               {bets.map((b) => (
                 <tr key={b.id}>
-                  <td className="muted">
-                    {new Date(b.createdAt).toLocaleDateString('ko-KR')}
+                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>
+                    {new Date(b.createdAt).toLocaleString('ko-KR', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </td>
                   <td>{matchName.get(b.matchId) ?? b.matchId}</td>
                   <td>{b.placedBy}</td>

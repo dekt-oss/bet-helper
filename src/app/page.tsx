@@ -1,6 +1,8 @@
 import { getMatches } from '@/lib/data-sources';
-import { listBets, summarize } from '@/lib/bets/store';
+import { listBets } from '@/lib/bets/store';
+import { computePoolBalance } from '@/lib/pool/balance';
 import { MatchList } from '@/components/MatchList';
+import { AutoRefresh } from '@/components/AutoRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +15,7 @@ export default async function DashboardPage() {
     getMatches(),
     listBets(),
   ]);
-  const stats = summarize(bets);
+  const pool = computePoolBalance(bets);
 
   const live = matches.filter(
     (m) => m.status === 'LIVE' || m.status === 'PAUSED',
@@ -25,29 +27,43 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <h1>대시보드</h1>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+        }}
+      >
+        <h1 style={{ marginBottom: 4 }}>대시보드</h1>
+        <AutoRefresh />
+      </div>
       <p className="muted">
-        경기 데이터 출처: <strong>{source}</strong> · 모임 자금 현황 요약
+        경기 데이터 출처: <strong>{source}</strong> · 공동자금 현황
       </p>
 
       <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <div className="card">
-          <div className="muted">총 베팅액</div>
-          <div className="stat">{won(stats.totalStake)}</div>
+          <div className="muted">현재 잔액</div>
+          <div className="stat">{won(pool.balance)}</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            초기 {won(pool.initial)}
+          </div>
         </div>
         <div className="card">
           <div className="muted">손익</div>
           <div
             className="stat"
-            style={{ color: stats.profit >= 0 ? 'var(--accent)' : 'var(--live)' }}
+            style={{ color: pool.profit >= 0 ? 'var(--accent)' : 'var(--live)' }}
           >
-            {stats.profit >= 0 ? '+' : ''}
-            {won(stats.profit)}
+            {pool.profit >= 0 ? '+' : ''}
+            {won(pool.profit)}
           </div>
         </div>
         <div className="card">
           <div className="muted">적중률</div>
-          <div className="stat">{(stats.winRate * 100).toFixed(0)}%</div>
+          <div className="stat">{(pool.winRate * 100).toFixed(0)}%</div>
         </div>
       </div>
 

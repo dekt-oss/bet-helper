@@ -6,6 +6,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import type { Bet } from '@/lib/types';
+import { SEED_BETS } from '@/lib/pool/config';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const BETS_FILE = path.join(DATA_DIR, 'bets.json');
@@ -15,7 +16,8 @@ async function readAll(): Promise<Bet[]> {
     const raw = await fs.readFile(BETS_FILE, 'utf-8');
     return JSON.parse(raw) as Bet[];
   } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    // 저장 파일이 없으면 시드(체코전 등) 내역으로 시작한다.
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [...SEED_BETS];
     throw err;
   }
 }
