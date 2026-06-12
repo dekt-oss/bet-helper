@@ -39,6 +39,15 @@ export default async function OddsPage() {
         {scraper ? ' · 베트맨 스크래퍼 켜짐' : ''} · 수동 입력은 항상 우선
       </p>
 
+      <p
+        className="muted"
+        style={{ fontSize: 13, background: 'var(--panel)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}
+      >
+        💡 자동 배당(The Odds API)은 해외 북메이커 기준이라 <strong>베트맨 고정배당과 다릅니다</strong>.
+        정산은 베팅 시 입력한 배당으로 계산되니, 실제 베팅은 베트맨 배당을 직접 입력(또는 베팅 등록 시 수정)하세요.
+        수동 입력값이 항상 우선합니다.
+      </p>
+
       <OddsForm matches={options} />
 
       {odds.length === 0 ? (
@@ -54,6 +63,7 @@ export default async function OddsPage() {
                 <th>승</th>
                 <th>무</th>
                 <th>패</th>
+                <th>출처</th>
                 <th>갱신</th>
               </tr>
             </thead>
@@ -64,6 +74,9 @@ export default async function OddsPage() {
                   <td>{o.home.toFixed(2)}</td>
                   <td>{o.draw.toFixed(2)}</td>
                   <td>{o.away.toFixed(2)}</td>
+                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>
+                    {o.source === 'betman' ? '✍️ 수동(베트맨)' : '🤖 자동(참고)'}
+                  </td>
                   <td className="muted" style={{ whiteSpace: 'nowrap' }}>
                     {new Date(o.updatedAt).toLocaleString('ko-KR', {
                       month: 'short',
