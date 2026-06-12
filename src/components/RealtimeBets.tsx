@@ -13,10 +13,15 @@ export function RealtimeBets() {
     const sb = getSupabaseBrowser();
     if (!sb) return;
     const channel = sb
-      .channel('bets-changes')
+      .channel('db-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bets' },
+        () => router.refresh(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'odds' },
         () => router.refresh(),
       )
       .subscribe();

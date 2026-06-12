@@ -1,8 +1,10 @@
 import { listBets, summarize } from '@/lib/bets/store';
 import { getMatches, getOdds } from '@/lib/data-sources';
-import { BetForm, type MatchOption, type OddsTriple } from '@/components/BetForm';
+import { BetForm, type OddsTriple } from '@/components/BetForm';
 import { SettleBet } from '@/components/SettleBet';
 import { AutoRefresh } from '@/components/AutoRefresh';
+import { buildMatchOptions } from '@/lib/teams/options';
+import { toKoreanTeam } from '@/lib/teams/korea';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,21 +33,21 @@ export default async function BetsPage() {
   ]);
   const stats = summarize(bets);
 
-  // 폼에 넘길 경기 옵션(예정/진행중 위주, 시간순)
-  const matchOptions: MatchOption[] = matches
-    .filter((m) => m.status !== 'FINISHED' && m.status !== 'CANCELLED')
-    .sort((a, b) => a.kickoff.localeCompare(b.kickoff))
-    .map((m) => ({ id: m.id, home: m.home.name, away: m.away.name }));
+  // 폼에 넘길 경기 옵션(한국 우선 + 날짜 + 한글)
+  const matchOptions = buildMatchOptions(matches);
 
-  // 배당 자동 채움용 맵
+  // 배당 자동 채움용 맵(베트맨 배당)
   const oddsByMatch: Record<string, OddsTriple> = {};
   for (const o of odds) {
     oddsByMatch[o.matchId] = { home: o.home, draw: o.draw, away: o.away };
   }
 
-  // 경기 id → 표시명 (베팅내역 테이블에서 matchId 대신 팀명 표시)
+  // 경기 id → 한글 표시명 (베팅내역 테이블에서 matchId 대신 팀명 표시)
   const matchName = new Map(
-    matches.map((m) => [m.id, `${m.home.name} vs ${m.away.name}`]),
+    matches.map((m) => [
+      m.id,
+      `${toKoreanTeam(m.home.name)} vs ${toKoreanTeam(m.away.name)}`,
+    ]),
   );
 
   return (

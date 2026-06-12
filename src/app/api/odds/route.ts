@@ -2,6 +2,6 @@ import { NextResponse } from 'next/server';
 import { getOdds } from '@/lib/data-sources';
 
 export async function GET() {
-  const { odds, enabled } = await getOdds();
-  return NextResponse.json({ enabled, count: odds.length, odds });
+  const { odds, scraper } = await getOdds();
+  return NextResponse.json({ scraper, count: odds.length, odds });
 }

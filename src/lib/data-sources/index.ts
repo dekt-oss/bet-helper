@@ -13,6 +13,7 @@ import {
   isBetmanEnabled,
   matchOddsToMatches,
 } from './betman';
+import { listOdds } from '@/lib/odds/store';
 
 /**
  * 경기 목록을 가져온다.
@@ -50,21 +51,28 @@ export async function getLiveMatches(): Promise<Match[]> {
 }
 
 /**
- * 배당 정보를 가져온다. 현재는 베트맨 스크래퍼만 연결되어 있다.
- * (활성화되지 않았으면 빈 배열)
+ * 베트맨 승부식 배당을 가져온다.
+ * 1순위: DB(odds 테이블) — 화면에서 입력한 베트맨 배당.
+ * 2순위: 베트맨 스크래퍼(ENABLE_BETMAN_SCRAPER=true 일 때) — DB 에 없는 경기 보강.
  */
-export async function getOdds(): Promise<{ odds: Odds[]; enabled: boolean }> {
-  const enabled = isBetmanEnabled();
-  if (!enabled) return { odds: [], enabled };
-  try {
-    // 배당과 경기 목록을 함께 가져와 팀명 기준으로 matchId 를 보정한다.
-    const [odds, { matches }] = await Promise.all([
-      fetchBetmanOdds(),
-      getMatches(),
-    ]);
-    return { odds: matchOddsToMatches(odds, matches), enabled };
-  } catch (err) {
-    console.warn('[data] betman 배당 수집 실패:', err);
-    return { odds: [], enabled };
+export async function getOdds(): Promise<{ odds: Odds[]; scraper: boolean }> {
+  const scraper = isBetmanEnabled();
+  const dbOdds = await listOdds();
+  const map = new Map<string, Odds>(dbOdds.map((o) => [o.matchId, o]));
+
+  if (scraper) {
+    try {
+      const [scraped, { matches }] = await Promise.all([
+        fetchBetmanOdds(),
+        getMatches(),
+      ]);
+      // 스크랩 배당은 DB 에 없는 경기에만 보강(DB 우선).
+      for (const o of matchOddsToMatches(scraped, matches)) {
+        if (!map.has(o.matchId)) map.set(o.matchId, o);
+      }
+    } catch (err) {
+      console.warn('[data] betman 스크래퍼 실패(무시):', err);
+    }
   }
+  return { odds: [...map.values()], scraper };
 }
