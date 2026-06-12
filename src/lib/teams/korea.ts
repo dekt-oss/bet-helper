@@ -78,7 +78,8 @@ const KOREAN: Record<string, string> = {
   haiti: '아이티',
 };
 
-function normalize(name: string): string {
+function normalize(name: string | null | undefined): string {
+  if (!name) return '';
   return name
     .replace(/\(.*?\)/g, '')
     .trim()
@@ -86,13 +87,17 @@ function normalize(name: string): string {
     .replace(/[\s.'’-]/g, '');
 }
 
-/** 영문/혼합 팀명을 한글로. 매핑에 없으면 원문 그대로. */
-export function toKoreanTeam(name: string): string {
+/** 영문/혼합 팀명을 한글로. 매핑에 없으면 원문, 비어있으면 '미정'. */
+export function toKoreanTeam(name: string | null | undefined): string {
+  if (!name) return '미정';
   return KOREAN[normalize(name)] ?? name;
 }
 
 /** 한국(대한민국) 팀인지 — 코드(KOR) 또는 이름으로 판별. */
-export function isKoreaTeam(name: string, code?: string): boolean {
+export function isKoreaTeam(
+  name: string | null | undefined,
+  code?: string | null,
+): boolean {
   if (code && code.toUpperCase() === 'KOR') return true;
   return ['korearepublic', 'southkorea', 'korea'].includes(normalize(name));
 }

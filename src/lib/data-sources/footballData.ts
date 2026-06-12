@@ -46,8 +46,15 @@ function mapStatus(s: string): MatchStatus {
   }
 }
 
-function toTeam(t: FDTeam): Team {
-  return { id: String(t.id), name: t.name, code: t.tla, flagUrl: t.crest };
+function toTeam(t: FDTeam | null): Team {
+  // football-data 는 미정(TBD) 경기에서 팀/이름을 null 로 준다 → 안전 처리.
+  if (!t) return { id: 'tbd', name: '미정' };
+  return {
+    id: t.id != null ? String(t.id) : 'tbd',
+    name: t.name ?? '미정',
+    code: t.tla ?? undefined,
+    flagUrl: t.crest ?? undefined,
+  };
 }
 
 export function isFootballDataConfigured(): boolean {
