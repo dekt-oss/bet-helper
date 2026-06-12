@@ -1,7 +1,7 @@
 import { getMatches, getOdds } from '@/lib/data-sources';
-import { MatchList, type OddsTriple } from '@/components/MatchList';
+import { type OddsTriple } from '@/components/MatchList';
+import { FixturesView } from '@/components/FixturesView';
 import { AutoRefresh } from '@/components/AutoRefresh';
-import { sortKoreaFirst } from '@/lib/teams/korea';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,8 +10,6 @@ export default async function FixturesPage() {
     getMatches(),
     getOdds(),
   ]);
-  // 한국 경기 최우선, 그다음 시간순.
-  const sorted = sortKoreaFirst(matches);
 
   const oddsByMatch: Record<string, OddsTriple> = {};
   for (const o of odds)
@@ -32,10 +30,10 @@ export default async function FixturesPage() {
         <AutoRefresh />
       </div>
       <p className="muted">
-        총 {matches.length}경기 · 한국 경기 우선 · 배당{' '}
-        {api ? '자동(The Odds API)' : '수동 입력'} · 출처 {source}
+        총 {matches.length}경기 · 배당 {api ? '자동(The Odds API)' : '수동 입력'} ·
+        출처 {source}
       </p>
-      <MatchList matches={sorted} oddsByMatch={oddsByMatch} />
+      <FixturesView matches={matches} oddsByMatch={oddsByMatch} />
     </>
   );
 }

@@ -41,7 +41,12 @@ export async function fetchWorldCupOdds(matches: Match[]): Promise<Odds[]> {
   const url =
     `https://api.the-odds-api.com/v4/sports/${SPORT}/odds/` +
     `?apiKey=${key}&regions=eu&markets=h2h&oddsFormat=decimal`;
-  const res = await fetch(url, { next: { revalidate: 300 } }); // 5분 캐시
+  // ⚠️ 무료 키는 월 500회. 6시간 캐시로 하루 최대 4회(월 ~120회)만 호출한다.
+  // (페이지 새로고침/자동갱신이 잦아도 이 캐시 안에서는 추가 호출이 없다)
+  const res = await fetch(url, { next: { revalidate: 21600 } });
+  // 남은 호출 횟수를 로그로 남겨 소진 여부를 확인할 수 있게 한다.
+  const remaining = res.headers.get('x-requests-remaining');
+  if (remaining) console.info(`[the-odds-api] 남은 호출: ${remaining}`);
   if (!res.ok) throw new Error(`the-odds-api ${res.status}`);
   const events = (await res.json()) as OAEvent[];
 

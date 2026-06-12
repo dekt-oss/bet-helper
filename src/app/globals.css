@@ -310,6 +310,30 @@ button.danger:hover {
   padding: 1px 5px;
   margin-right: 6px;
 }
+
+/* ── 정렬/필터 바 ───────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.filter-bar label.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.filter-bar select {
+  width: auto;
+  padding: 6px 8px;
+}
+.filter-bar label.checkbox input {
+  width: auto;
+}
 @media (max-width: 600px) {
   .form-grid {
     grid-template-columns: 1fr;
