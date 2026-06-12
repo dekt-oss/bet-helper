@@ -9,6 +9,7 @@ const KOREAN: Record<string, string> = {
   korearepublic: '대한민국',
   southkorea: '대한민국',
   korea: '대한민국',
+  한국: '대한민국',
   brazil: '브라질',
   argentina: '아르헨티나',
   france: '프랑스',

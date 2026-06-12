@@ -103,6 +103,10 @@ export async function fetchBetmanOdds(): Promise<Odds[]> {
 export async function parseBetmanOdds(raw: string): Promise<Odds[]> {
   if (!raw || !raw.trim()) return [];
 
+  // 0순위: gameSlip.do 형식(compSchedules.keys/datas)
+  const gs = parseBetmanGameSlip(raw);
+  if (gs.length > 0) return gs;
+
   // 1순위: JSON 파싱 시도 (베트맨 내부 XHR 이 JSON 일 가능성)
   try {
     const json = JSON.parse(raw) as unknown;
@@ -118,6 +122,62 @@ export async function parseBetmanOdds(raw: string): Promise<Odds[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * 베트맨 gameSlip.do 응답(compSchedules.keys/datas)을 파싱한다.
+ * 축구 월드컵 "승무패"(1X2) 행만 골라 Odds 로 변환한다.
+ *  winAllot=홈 승, drawAllot=무, loseAllot=원정 승(=홈 패).
+ * 어떤 입력에도 throw 하지 않는다(실패 시 []).
+ */
+export function parseBetmanGameSlip(raw: string): Odds[] {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  const cs = (json as { compSchedules?: { keys?: unknown; datas?: unknown } })
+    ?.compSchedules;
+  if (!cs || !Array.isArray(cs.keys) || !Array.isArray(cs.datas)) return [];
+
+  const keys = cs.keys as string[];
+  const idx = (k: string) => keys.indexOf(k);
+  const iItem = idx('itemCode');
+  const iGame = idx('gameName');
+  const iHome = idx('homeName');
+  const iAway = idx('awayName');
+  const iWin = idx('winAllot');
+  const iDraw = idx('drawAllot');
+  const iLose = idx('loseAllot');
+  const iBet = idx('betTypNm');
+  if (iHome < 0 || iWin < 0 || iLose < 0) return [];
+
+  const now = new Date().toISOString();
+  const out: Odds[] = [];
+  for (const row of cs.datas as unknown[][]) {
+    if (iItem >= 0 && row[iItem] !== 'SC') continue; // 축구만
+    if (iBet >= 0 && row[iBet] !== '승무패') continue; // 1X2 마켓만
+    if (iGame >= 0 && !String(row[iGame] ?? '').includes('월드컵')) continue;
+
+    const home = str(row[iHome]);
+    const away = str(row[iAway]);
+    const w = parseOdd(row[iWin]);
+    const d = iDraw >= 0 ? parseOdd(row[iDraw]) : null;
+    const l = parseOdd(row[iLose]);
+    if (w == null || d == null || l == null || !home || !away) continue;
+
+    out.push({
+      matchId: `betman-${home}-${away}`,
+      externalRef: `${home}|${away}`,
+      home: w,
+      draw: d,
+      away: l,
+      updatedAt: now,
+      source: 'betman',
+    });
+  }
+  return out;
 }
 
 /**
