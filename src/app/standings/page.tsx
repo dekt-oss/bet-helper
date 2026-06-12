@@ -22,42 +22,37 @@ export default async function StandingsPage() {
         <h1 style={{ marginBottom: 4 }}>조별리그 순위</h1>
         <AutoRefresh />
       </div>
-      <p className="muted">종료된 경기 기준 승점·득실 집계 (승 3점 / 무 1점)</p>
+      <p className="muted">승 3점 · 무 1점 · 상위 2팀 16강 진출 (초록)</p>
 
       {groups.length === 0 ? (
         <p className="muted">
-          아직 조별리그 데이터가 없습니다. (대회 조편성이 확정되면 표시됩니다)
+          아직 조별리그 데이터가 없습니다. (조편성이 확정되면 표시됩니다)
         </p>
       ) : (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+        <div className="standings-grid">
           {groups.map((g) => (
-            <div className="card table-wrap" key={g.group}>
-              <h3 style={{ marginTop: 0 }}>{g.group}</h3>
-              <table>
+            <div className="card standings-card" key={g.group}>
+              <h3 style={{ margin: '0 0 8px' }}>{g.group}</h3>
+              <table className="standings-table">
                 <thead>
                   <tr>
+                    <th style={{ width: 18 }}></th>
                     <th>팀</th>
                     <th title="경기수">경기</th>
-                    <th title="승">승</th>
-                    <th title="무">무</th>
-                    <th title="패">패</th>
+                    <th title="승-무-패">승무패</th>
                     <th title="득실차">득실</th>
                     <th title="승점">점</th>
                   </tr>
                 </thead>
                 <tbody>
                   {g.rows.map((r, i) => (
-                    <tr key={r.team}>
-                      <td>
-                        <span className="muted" style={{ marginRight: 6 }}>
-                          {i + 1}
-                        </span>
-                        {r.team}
-                      </td>
+                    <tr key={r.team} className={i < 2 ? 'qualify' : ''}>
+                      <td className="muted">{i + 1}</td>
+                      <td className="team">{r.team}</td>
                       <td>{r.played}</td>
-                      <td>{r.win}</td>
-                      <td>{r.draw}</td>
-                      <td>{r.loss}</td>
+                      <td className="muted" style={{ whiteSpace: 'nowrap' }}>
+                        {r.win}-{r.draw}-{r.loss}
+                      </td>
                       <td>
                         {r.gd > 0 ? '+' : ''}
                         {r.gd}

@@ -124,3 +124,16 @@ export function sortKoreaFirst(matches: Match[]): Match[] {
 export function matchLabel(m: Match): string {
   return `${toKoreanTeam(m.home.name)} vs ${toKoreanTeam(m.away.name)}`;
 }
+
+/** "Group A" / "GROUP_A" / "A" → "A조". 매칭 안 되면 원문. */
+export function koreanGroupName(stage: string | undefined | null): string {
+  if (!stage) return '';
+  const m =
+    stage.match(/group[\s_]*([a-l])/i) || stage.match(/^\s*([a-l])\s*조?$/i);
+  return m ? `${m[1].toUpperCase()}조` : stage;
+}
+
+/** 서로 다른 소스의 팀명을 같은 기준으로 비교하기 위한 표준 키(한글 별칭 통일). */
+export function teamCanon(name: string | null | undefined): string {
+  return toKoreanTeam(name);
+}

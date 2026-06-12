@@ -246,6 +246,70 @@ button.danger:hover {
 .table-wrap table {
   min-width: 720px;
 }
+
+/* ── 조별순위: 컴팩트 카드 그리드 ─────────────────────── */
+.standings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.standings-card {
+  padding: 12px 14px;
+}
+.standings-table {
+  font-size: 13px;
+}
+.standings-table th,
+.standings-table td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.standings-table th:nth-child(2),
+.standings-table td.team {
+  text-align: left;
+  font-weight: 500;
+}
+.standings-table tr.qualify td {
+  border-left: 0;
+}
+.standings-table tr.qualify td.team {
+  box-shadow: inset 3px 0 0 var(--accent);
+  padding-left: 9px;
+}
+
+/* ── 경기 행 배당 칩 (베팅사이트 느낌) ─────────────────── */
+.odds-chips {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.odds-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 46px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.odds-chip b {
+  font-size: 13px;
+  color: var(--accent);
+}
+.odds-chip .k {
+  color: var(--muted);
+}
+.stage-tag {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-right: 6px;
+}
 @media (max-width: 600px) {
   .form-grid {
     grid-template-columns: 1fr;

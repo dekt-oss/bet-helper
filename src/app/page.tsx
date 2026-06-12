@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { getMatches } from '@/lib/data-sources';
+import { getMatches, getOdds } from '@/lib/data-sources';
 import { listBets } from '@/lib/bets/store';
 import { computePoolBalance } from '@/lib/pool/balance';
-import { MatchList } from '@/components/MatchList';
+import { MatchList, type OddsTriple } from '@/components/MatchList';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { sortKoreaFirst, isKoreaMatch, toKoreanTeam } from '@/lib/teams/korea';
 
@@ -21,11 +21,16 @@ const statusLabel: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const [{ matches, source }, bets] = await Promise.all([
+  const [{ matches, source }, bets, { odds }] = await Promise.all([
     getMatches(),
     listBets(),
+    getOdds(),
   ]);
   const pool = computePoolBalance(bets);
+
+  const oddsByMatch: Record<string, OddsTriple> = {};
+  for (const o of odds)
+    oddsByMatch[o.matchId] = { home: o.home, draw: o.draw, away: o.away };
 
   const matchKorName = new Map(
     matches.map((m) => [
@@ -134,19 +139,19 @@ export default async function DashboardPage() {
       {live.length > 0 && (
         <>
           <h2 style={{ marginTop: 32 }}>🔴 진행중 경기</h2>
-          <MatchList matches={live} />
+          <MatchList matches={live} oddsByMatch={oddsByMatch} />
         </>
       )}
 
       {koreaUpcoming.length > 0 && (
         <>
           <h2 style={{ marginTop: 32 }}>🇰🇷 한국 경기</h2>
-          <MatchList matches={koreaUpcoming} />
+          <MatchList matches={koreaUpcoming} oddsByMatch={oddsByMatch} />
         </>
       )}
 
       <h2 style={{ marginTop: 32 }}>다가오는 경기</h2>
-      <MatchList matches={upcoming} />
+      <MatchList matches={upcoming} oddsByMatch={oddsByMatch} />
     </>
   );
 }

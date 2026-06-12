@@ -13,6 +13,7 @@ import {
   isBetmanEnabled,
   matchOddsToMatches,
 } from './betman';
+import { fetchWorldCupOdds, isOddsApiConfigured } from './theOddsApi';
 import { listOdds } from '@/lib/odds/store';
 
 /**
@@ -55,24 +56,36 @@ export async function getLiveMatches(): Promise<Match[]> {
  * 1순위: DB(odds 테이블) — 화면에서 입력한 베트맨 배당.
  * 2순위: 베트맨 스크래퍼(ENABLE_BETMAN_SCRAPER=true 일 때) — DB 에 없는 경기 보강.
  */
-export async function getOdds(): Promise<{ odds: Odds[]; scraper: boolean }> {
+export interface OddsResult {
+  odds: Odds[];
+  scraper: boolean; // 베트맨 스크래퍼 활성
+  api: boolean; // 자동 배당 API(The Odds API) 활성
+}
+
+export async function getOdds(): Promise<OddsResult> {
   const scraper = isBetmanEnabled();
-  const dbOdds = await listOdds();
+  const api = isOddsApiConfigured();
+  const [dbOdds, { matches }] = await Promise.all([listOdds(), getMatches()]);
+  // 우선순위: 수동 입력(DB) > 자동 배당 API > 베트맨 스크래퍼
   const map = new Map<string, Odds>(dbOdds.map((o) => [o.matchId, o]));
+
+  if (api) {
+    try {
+      for (const o of await fetchWorldCupOdds(matches)) {
+        if (!map.has(o.matchId)) map.set(o.matchId, o);
+      }
+    } catch (err) {
+      console.warn('[data] The Odds API 실패(무시):', err);
+    }
+  }
 
   if (scraper) {
     try {
-      const [scraped, { matches }] = await Promise.all([
-        fetchBetmanOdds(),
-        getMatches(),
-      ]);
-      // 스크랩 배당은 DB 에 없는 경기에만 보강(DB 우선).
-      for (const o of matchOddsToMatches(scraped, matches)) {
-        if (!map.has(o.matchId)) map.set(o.matchId, o);
-      }
+      const scraped = matchOddsToMatches(await fetchBetmanOdds(), matches);
+      for (const o of scraped) if (!map.has(o.matchId)) map.set(o.matchId, o);
     } catch (err) {
       console.warn('[data] betman 스크래퍼 실패(무시):', err);
     }
   }
-  return { odds: [...map.values()], scraper };
+  return { odds: [...map.values()], scraper, api };
 }

@@ -1,7 +1,7 @@
 // 조별리그 그룹별 순위 계산 — 종료된 경기의 스코어로 승점/득실을 집계한다.
 
 import type { Match } from '@/lib/types';
-import { toKoreanTeam } from '@/lib/teams/korea';
+import { toKoreanTeam, koreanGroupName } from '@/lib/teams/korea';
 
 export interface StandingRow {
   team: string; // 한글 팀명
@@ -50,7 +50,7 @@ export function computeGroupStandings(matches: Match[]): GroupStandings[] {
 
   for (const m of matches) {
     if (!isGroupStage(m.stage)) continue;
-    const group = m.stage!.trim();
+    const group = koreanGroupName(m.stage); // "Group A" → "A조"
     const table = groups.get(group) ?? new Map<string, StandingRow>();
     groups.set(group, table);
 
