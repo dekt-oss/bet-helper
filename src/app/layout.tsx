@@ -25,7 +25,8 @@ export default function RootLayout({
             <nav>
               <Link href="/">대시보드</Link>
               <Link href="/fixtures">경기일정</Link>
-              <Link href="/odds">배당</Link>
+              <Link href="/standings">조별순위</Link>
+              <Link href="/odds">승부식</Link>
               <Link href="/bets">베팅내역</Link>
               <Link href="/pool">정산</Link>
             </nav>

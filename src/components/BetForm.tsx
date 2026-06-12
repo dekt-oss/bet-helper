@@ -4,12 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { createBetAction, type ActionState } from '@/lib/bets/actions';
 import type { Outcome } from '@/lib/types';
+import { type MatchOption, matchOptionLabel } from '@/lib/teams/options';
 
-export interface MatchOption {
-  id: string;
-  home: string;
-  away: string;
-}
+export type { MatchOption };
 
 export interface OddsTriple {
   home: number;
@@ -40,12 +37,11 @@ export function BetForm({
   const [matchId, setMatchId] = useState('');
   const [pick, setPick] = useState<Outcome | ''>('');
   const [odds, setOdds] = useState('');
-  // 사용자가 배당을 직접 수정했으면 자동채움이 덮어쓰지 않는다.
   const [oddsTouched, setOddsTouched] = useState(false);
 
   const hasMatches = matches.length > 0;
+  const triple = oddsByMatch[matchId];
 
-  // 등록 성공 시 폼을 초기화해 중복 베팅을 막는다.
   useEffect(() => {
     if (state.ok) {
       formRef.current?.reset();
@@ -61,25 +57,21 @@ export function BetForm({
     [matches, matchId],
   );
 
-  // 경기/선택이 바뀌면 배당이 있을 때만 자동으로 채운다(사용자가 수정했으면 보류).
   function autofillOdds(nextMatchId: string, nextPick: Outcome | '') {
     if (oddsTouched) return;
-    const triple = oddsByMatch[nextMatchId];
-    if (triple && nextPick) {
+    const t = oddsByMatch[nextMatchId];
+    if (t && nextPick) {
       const v =
-        nextPick === 'HOME'
-          ? triple.home
-          : nextPick === 'DRAW'
-            ? triple.draw
-            : triple.away;
+        nextPick === 'HOME' ? t.home : nextPick === 'DRAW' ? t.draw : t.away;
       setOdds(String(v));
     }
   }
 
-  const pickLabels: { value: Outcome; label: string }[] = [
-    { value: 'HOME', label: selected ? `${selected.home} 승` : '승' },
-    { value: 'DRAW', label: '무' },
-    { value: 'AWAY', label: selected ? `${selected.away} 승` : '패' },
+  // 승/무/패 라벨 + 베트맨 배당 표시.
+  const pickOptions: { value: Outcome; label: string; odd?: number }[] = [
+    { value: 'HOME', label: selected ? `${selected.home} 승` : '승', odd: triple?.home },
+    { value: 'DRAW', label: '무승부', odd: triple?.draw },
+    { value: 'AWAY', label: selected ? `${selected.away} 승` : '패', odd: triple?.away },
   ];
 
   return (
@@ -94,7 +86,7 @@ export function BetForm({
 
       <div className="form-grid">
         <div className="full">
-          <label htmlFor="matchId">경기</label>
+          <label htmlFor="matchId">경기 (한국 경기 우선 · 날짜 표시)</label>
           {hasMatches ? (
             <select
               id="matchId"
@@ -110,7 +102,7 @@ export function BetForm({
               <option value="">경기를 선택하세요</option>
               {matches.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.home} vs {m.away}
+                  {matchOptionLabel(m)}
                 </option>
               ))}
             </select>
@@ -128,9 +120,9 @@ export function BetForm({
         </div>
 
         <div className="full">
-          <label>선택 (승/무/패)</label>
+          <label>선택 (승/무/패) — 괄호는 베트맨 배당</label>
           <div className="radio-row">
-            {pickLabels.map((p) => (
+            {pickOptions.map((p) => (
               <label key={p.value} htmlFor={`pick-${p.value}`}>
                 <input
                   id={`pick-${p.value}`}
@@ -144,7 +136,17 @@ export function BetForm({
                   }}
                   required
                 />
-                <span>{p.label}</span>
+                <span>
+                  {p.label}
+                  {p.odd ? (
+                    <>
+                      <br />
+                      <small style={{ color: 'var(--accent)' }}>
+                        {p.odd.toFixed(2)}
+                      </small>
+                    </>
+                  ) : null}
+                </span>
               </label>
             ))}
           </div>
@@ -153,9 +155,7 @@ export function BetForm({
         <div>
           <label htmlFor="oddsAtPlacement">
             배당{' '}
-            {oddsByMatch[matchId] && !oddsTouched
-              ? '(자동 채움, 수정 가능)'
-              : '(수동 입력)'}
+            {triple && !oddsTouched ? '(베트맨 자동, 수정 가능)' : '(수동 입력)'}
           </label>
           <input
             id="oddsAtPlacement"
@@ -181,20 +181,14 @@ export function BetForm({
             type="number"
             step="1000"
             min="1000"
-            placeholder="예: 10000"
+            placeholder="예: 30000"
             required
           />
         </div>
 
         <div>
           <label htmlFor="placedBy">건 사람</label>
-          <input
-            id="placedBy"
-            name="placedBy"
-            type="text"
-            placeholder="예: 철수"
-            required
-          />
+          <input id="placedBy" name="placedBy" type="text" placeholder="예: 철수" required />
         </div>
 
         <div>

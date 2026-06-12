@@ -1,4 +1,5 @@
 import type { Match } from '@/lib/types';
+import { toKoreanTeam, isKoreaMatch } from '@/lib/teams/korea';
 
 function formatKickoff(iso: string): string {
   return new Intl.DateTimeFormat('ko-KR', {
@@ -18,11 +19,14 @@ export function MatchList({ matches }: { matches: Match[] }) {
     <div className="card">
       {matches.map((m) => {
         const isLive = m.status === 'LIVE' || m.status === 'PAUSED';
+        const korea = isKoreaMatch(m);
         return (
           <div className="match-row" key={m.id}>
             <div>
               <div>
-                {m.home.name} <span className="muted">vs</span> {m.away.name}
+                {korea && <span title="한국 경기">🇰🇷 </span>}
+                {toKoreanTeam(m.home.name)} <span className="muted">vs</span>{' '}
+                {toKoreanTeam(m.away.name)}
               </div>
               <div className="muted" style={{ fontSize: 12 }}>
                 {m.stage ? `${m.stage} · ` : ''}
