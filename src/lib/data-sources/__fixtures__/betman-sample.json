@@ -1,0 +1,32 @@
+{
+  "_note": "추정 구조 — 실제 베트맨 응답 확보 시 교체할 것. 필드명은 betman.ts 의 JSON_FIELDS 후보키와 맞춤.",
+  "list": [
+    {
+      "gameNo": "0712001",
+      "homeTeam": "대한민국",
+      "awayTeam": "브라질",
+      "winRate": "3.10",
+      "drawRate": "3.30",
+      "loseRate": "2.05",
+      "closeDate": "2026-07-12 20:00"
+    },
+    {
+      "gameNo": "0712002",
+      "homeTeam": "프랑스",
+      "awayTeam": "일본",
+      "winRate": "1.45",
+      "drawRate": "4.20",
+      "loseRate": "6.50",
+      "closeDate": "2026-07-12 23:00"
+    },
+    {
+      "gameNo": "0712003",
+      "homeTeam": "에러팀",
+      "awayTeam": "결측팀",
+      "winRate": "0",
+      "drawRate": "abc",
+      "loseRate": "",
+      "closeDate": "2026-07-13 02:00"
+    }
+  ]
+}
