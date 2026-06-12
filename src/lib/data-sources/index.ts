@@ -8,7 +8,11 @@ import {
   fetchLiveWorldCupMatches,
   isFootballDataConfigured,
 } from './footballData';
-import { fetchBetmanOdds, isBetmanEnabled } from './betman';
+import {
+  fetchBetmanOdds,
+  isBetmanEnabled,
+  matchOddsToMatches,
+} from './betman';
 
 /**
  * 경기 목록을 가져온다.
@@ -47,7 +51,12 @@ export async function getOdds(): Promise<{ odds: Odds[]; enabled: boolean }> {
   const enabled = isBetmanEnabled();
   if (!enabled) return { odds: [], enabled };
   try {
-    return { odds: await fetchBetmanOdds(), enabled };
+    // 배당과 경기 목록을 함께 가져와 팀명 기준으로 matchId 를 보정한다.
+    const [odds, { matches }] = await Promise.all([
+      fetchBetmanOdds(),
+      getMatches(),
+    ]);
+    return { odds: matchOddsToMatches(odds, matches), enabled };
   } catch (err) {
     console.warn('[data] betman 배당 수집 실패:', err);
     return { odds: [], enabled };
