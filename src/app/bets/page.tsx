@@ -64,7 +64,7 @@ export default async function BetsPage() {
       {bets.length === 0 ? (
         <p className="muted">아직 등록된 베팅이 없습니다. 위 폼으로 추가하세요.</p>
       ) : (
-        <div className="card">
+        <div className="card table-wrap">
           <table>
             <thead>
               <tr>

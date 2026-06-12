@@ -10,11 +10,23 @@ function SettleButtons() {
   const { pending } = useFormStatus();
   return (
     <div className="btn-row">
-      <button type="submit" name="status" value="WON" className="primary" disabled={pending}>
-        적중
+      <button
+        type="submit"
+        name="status"
+        value="WON"
+        className="primary"
+        disabled={pending}
+      >
+        ✓ 적중
       </button>
-      <button type="submit" name="status" value="LOST" disabled={pending}>
-        미적중
+      <button
+        type="submit"
+        name="status"
+        value="LOST"
+        className="danger"
+        disabled={pending}
+      >
+        ✗ 미적중
       </button>
       <button type="submit" name="status" value="VOID" disabled={pending}>
         무효
@@ -41,6 +53,8 @@ export function SettleBet({
   return (
     <form action={formAction} className="btn-row" style={{ flexWrap: 'wrap' }}>
       <input type="hidden" name="id" value={id} />
+      {/* 무효 시 원금 반환 계산용 — 서버가 상태별로 수령액을 결정한다. */}
+      <input type="hidden" name="stake" value={stake} />
       <input
         name="payout"
         type="number"
@@ -48,8 +62,9 @@ export function SettleBet({
         min="0"
         value={payout}
         onChange={(e) => setPayout(e.target.value)}
+        aria-label="적중 시 수령액 (원)"
         title="적중 시 수령액"
-        style={{ width: 110 }}
+        className="payout-input"
       />
       <SettleButtons />
       {state.error && <span className="error">⚠ {state.error}</span>}

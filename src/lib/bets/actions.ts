@@ -66,16 +66,20 @@ export async function settleBetAction(
   if (!['WON', 'LOST', 'VOID'].includes(status))
     return { ok: false, error: '정산 상태가 올바르지 않습니다.' };
 
-  // 적중(WON)일 때만 수령액을 기록한다. 미적중/무효는 0/미설정.
-  let payout: number | undefined;
+  // 수령액은 상태별로 서버가 권위있게 결정한다(클라이언트 입력은 WON 에만 사용).
+  //  - WON  : 입력한 수령액 (기본 제안값 = 금액×배당)
+  //  - VOID : 원금 반환 (= 금액)
+  //  - LOST : 0원
+  const stake = Math.round(num(formData.get('stake')));
+  let payout: number;
   if (status === 'WON') {
     payout = Math.round(num(formData.get('payout')));
     if (!Number.isFinite(payout) || payout < 0)
       return { ok: false, error: '수령액은 0 이상의 숫자여야 합니다.' };
   } else if (status === 'VOID') {
-    // 무효: 원금 반환을 수령액으로 기록(있으면)
-    const p = num(formData.get('payout'));
-    payout = Number.isFinite(p) ? Math.round(p) : undefined;
+    payout = Number.isFinite(stake) && stake > 0 ? stake : 0;
+  } else {
+    payout = 0; // LOST
   }
 
   const updated = await updateBet(id, { status, payout });
