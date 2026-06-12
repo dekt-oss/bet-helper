@@ -15,7 +15,16 @@ export type NewBet = Omit<Bet, 'id' | 'status' | 'createdAt'> &
 // ── 공개 API (백엔드 자동 선택) ──────────────────────────
 
 export async function listBets(): Promise<Bet[]> {
-  return isSupabaseConfigured() ? sbListBets() : fileListBets();
+  if (isSupabaseConfigured()) {
+    try {
+      return await sbListBets();
+    } catch (err) {
+      // Supabase 실패(테이블 없음/권한 등) 시에도 페이지가 죽지 않도록 폴백.
+      console.error('[store] Supabase 조회 실패 → 시드/파일로 폴백:', err);
+      return fileListBets();
+    }
+  }
+  return fileListBets();
 }
 
 export async function addBet(input: NewBet): Promise<Bet> {

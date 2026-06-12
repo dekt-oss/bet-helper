@@ -39,14 +39,23 @@ export async function createBetAction(
   if (!Number.isFinite(stake) || stake <= 0)
     return { ok: false, error: '금액은 0보다 큰 숫자여야 합니다.' };
 
-  await addBet({
-    matchId,
-    placedBy,
-    pick,
-    oddsAtPlacement,
-    stake: Math.round(stake),
-    note,
-  });
+  try {
+    await addBet({
+      matchId,
+      placedBy,
+      pick,
+      oddsAtPlacement,
+      stake: Math.round(stake),
+      note,
+    });
+  } catch (err) {
+    console.error('[action] addBet 실패:', err);
+    return {
+      ok: false,
+      error:
+        '저장 실패: Supabase 테이블/키 설정을 확인하세요 (schema.sql 실행 여부).',
+    };
+  }
   revalidatePath('/bets');
   revalidatePath('/');
   return { ok: true };
@@ -82,8 +91,13 @@ export async function settleBetAction(
     payout = 0; // LOST
   }
 
-  const updated = await updateBet(id, { status, payout });
-  if (!updated) return { ok: false, error: '해당 베팅을 찾을 수 없습니다.' };
+  try {
+    const updated = await updateBet(id, { status, payout });
+    if (!updated) return { ok: false, error: '해당 베팅을 찾을 수 없습니다.' };
+  } catch (err) {
+    console.error('[action] updateBet 실패:', err);
+    return { ok: false, error: '정산 저장 실패: Supabase 설정을 확인하세요.' };
+  }
 
   revalidatePath('/bets');
   revalidatePath('/');

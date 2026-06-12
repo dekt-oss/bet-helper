@@ -31,8 +31,14 @@ export async function getMatches(): Promise<{
       console.warn('[data] football-data 실패, openfootball 로 폴백:', err);
     }
   }
-  const matches = await fetchWorldCupFixtures();
-  return { matches, source: 'openfootball' };
+  try {
+    const matches = await fetchWorldCupFixtures();
+    return { matches, source: 'openfootball' };
+  } catch (err) {
+    // 외부 데이터 소스가 모두 실패해도 페이지는 떠야 한다.
+    console.error('[data] openfootball 실패 → 빈 목록 반환:', err);
+    return { matches: [], source: 'none' };
+  }
 }
 
 /** 진행중 경기만 추려서 반환. */
