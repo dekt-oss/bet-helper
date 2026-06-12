@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
+import { RealtimeBets } from '@/components/RealtimeBets';
 
 export const metadata: Metadata = {
   title: 'Bet Helper — 월드컵 공동 베팅 관리',
@@ -31,6 +32,7 @@ export default function RootLayout({
           </div>
         </header>
         <main className="container">{children}</main>
+        <RealtimeBets />
       </body>
     </html>
   );
