@@ -54,6 +54,7 @@ export type DataSourceId =
   | 'openfootball'
   | 'football-data'
   | 'api-football'
+  | 'oddsapi'
   | 'betman'
   | 'manual';
 

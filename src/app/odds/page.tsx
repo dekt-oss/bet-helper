@@ -7,7 +7,7 @@ import { toKoreanTeam } from '@/lib/teams/korea';
 export const dynamic = 'force-dynamic';
 
 export default async function OddsPage() {
-  const [{ matches }, { odds, scraper }] = await Promise.all([
+  const [{ matches }, { odds, scraper, api }] = await Promise.all([
     getMatches(),
     getOdds(),
   ]);
@@ -34,8 +34,9 @@ export default async function OddsPage() {
         <AutoRefresh />
       </div>
       <p className="muted">
-        승/무/패(1X2) 배당
-        {scraper ? ' · 스크래퍼 활성' : ' · 수동 입력'}
+        승/무/패(1X2) 배당 · 자동 배당{' '}
+        {api ? '켜짐(The Odds API)' : '꺼짐'}
+        {scraper ? ' · 베트맨 스크래퍼 켜짐' : ''} · 수동 입력은 항상 우선
       </p>
 
       <OddsForm matches={options} />
