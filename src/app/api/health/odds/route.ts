@@ -1,46 +1,56 @@
-// 배당 쓰기 실패 정밀 진단: upsert vs insert, 전체 에러(code/details/hint).
+// 배당 쓰기 실패 정밀 진단: URL 구성 + bets/odds 동일 쿼리 비교.
 // 예: /api/health/odds
 import { NextResponse } from 'next/server';
-import { getSupabaseServer, isSupabaseConfigured } from '@/lib/db/supabase';
+import {
+  getSupabaseServer,
+  isSupabaseConfigured,
+  supabaseUrlDebug,
+} from '@/lib/db/supabase';
 
 export const dynamic = 'force-dynamic';
 
-type PgErr = { code?: string; details?: string; hint?: string; message?: string };
+type PgErr = { code?: string; message?: string };
 
-async function tryWrite(useUpsert: boolean) {
+async function probe(table: string) {
   const sb = getSupabaseServer();
   if (!sb) return { ok: false, error: 'no client' };
-  const row = {
-    match_id: '__healthcheck__',
-    home: 1.5,
-    draw: 3,
-    away: 5,
-    source: 'oddsapi',
-    updated_at: new Date().toISOString(),
-  };
-  const q = useUpsert
-    ? sb.from('odds').upsert(row, { onConflict: 'match_id' })
-    : sb.from('odds').insert(row);
-  const { error } = await q.select();
-  if (!error) return { ok: true };
+  const { error, count } = await sb
+    .from(table)
+    .select('*', { count: 'exact' })
+    .limit(1);
+  if (!error) return { ok: true, count };
   const e = error as PgErr;
-  return { ok: false, message: e.message, code: e.code, details: e.details, hint: e.hint };
+  return { ok: false, code: e.code, message: e.message };
 }
 
-async function tryReadColumns() {
+async function writeProbe() {
   const sb = getSupabaseServer();
   if (!sb) return { ok: false, error: 'no client' };
-  // 한 행 읽어 컬럼 구조 확인(테이블이 우리가 기대한 스키마인지).
-  const { data, error } = await sb.from('odds').select('*').limit(1);
-  if (error) return { ok: false, message: (error as PgErr).message };
-  return { ok: true, columns: data && data[0] ? Object.keys(data[0]) : '(빈 테이블)' };
+  const { error } = await sb
+    .from('odds')
+    .upsert(
+      {
+        match_id: '__healthcheck__',
+        home: 1.5,
+        draw: 3,
+        away: 5,
+        source: 'oddsapi',
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'match_id' },
+    )
+    .select();
+  if (!error) return { ok: true };
+  const e = error as PgErr;
+  return { ok: false, code: e.code, message: e.message };
 }
 
 export async function GET() {
   return NextResponse.json({
     persistent: isSupabaseConfigured(),
-    read: await tryReadColumns(),
-    upsert: await tryWrite(true),
-    insert: await tryWrite(false),
+    url: supabaseUrlDebug(), // raw 에 끝슬래시/경로가 있는지 확인
+    bets: await probe('bets'),
+    odds: await probe('odds'),
+    oddsWrite: await writeProbe(),
   });
 }
