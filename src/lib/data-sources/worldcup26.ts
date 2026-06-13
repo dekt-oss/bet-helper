@@ -148,8 +148,15 @@ function num(s: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// worldcup26.ir 의 local_date 는 이란(테헤란, UTC+3:30) 기준이다.
+// (persian_date 와 시:분이 동일 → 테헤란 시계). 분 단위 오프셋으로 UTC 로 환산한다.
+// 혹시 다른 기준이면 WORLDCUP26_TZ_OFFSET_MINUTES 로 조정(테헤란=210, 한국=540, UTC=0).
+const TZ_OFFSET_MIN = Number(
+  process.env.WORLDCUP26_TZ_OFFSET_MINUTES ?? 210,
+);
+
 function toKickoffIso(local?: string): string {
-  // "MM/DD/YYYY HH:mm" → ISO. openfootball 과 동일하게 입력값을 UTC 로 간주(타임존 TODO).
+  // "MM/DD/YYYY HH:mm" 를 TZ_OFFSET_MIN 시간대의 벽시계로 보고 UTC 로 환산.
   if (!local) return new Date(0).toISOString();
   const m = local.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ T]+(\d{1,2}):(\d{2})/);
   if (!m) {
@@ -157,8 +164,9 @@ function toKickoffIso(local?: string): string {
     return Number.isNaN(d.getTime()) ? new Date(0).toISOString() : d.toISOString();
   }
   const [, mo, day, y, h, mi] = m;
-  const p = (x: string) => x.padStart(2, '0');
-  return new Date(`${y}-${p(mo)}-${p(day)}T${p(h)}:${p(mi)}:00Z`).toISOString();
+  const utcMs =
+    Date.UTC(+y, +mo - 1, +day, +h, +mi) - TZ_OFFSET_MIN * 60_000;
+  return new Date(utcMs).toISOString();
 }
 
 function parseScorers(raw: string | undefined): string[] {
