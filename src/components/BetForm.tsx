@@ -63,6 +63,7 @@ export function BetForm({
     return '';
   });
   const [oddsTouched, setOddsTouched] = useState(false);
+  const [stake, setStake] = useState('');
   // onSuccess 는 매 렌더 새 함수일 수 있어 ref 로 최신값만 호출(effect 루프 방지).
   const onSuccessRef = useRef(onSuccess);
   onSuccessRef.current = onSuccess;
@@ -76,6 +77,7 @@ export function BetForm({
       setMatchId('');
       setPick('');
       setOdds('');
+      setStake('');
       setOddsTouched(false);
       onSuccessRef.current?.();
     }
@@ -102,6 +104,12 @@ export function BetForm({
     { value: 'DRAW', label: '무승부', odd: triple?.draw },
     { value: 'AWAY', label: selected ? `${selected.away} 승` : '패', odd: triple?.away },
   ];
+
+  // 예상 수령액(= 금액 × 배당) 실시간 계산.
+  const stakeNum = Number(stake);
+  const oddsNum = Number(odds);
+  const expected =
+    stakeNum > 0 && oddsNum > 1 ? Math.round(stakeNum * oddsNum) : null;
 
   return (
     <form
@@ -215,20 +223,27 @@ export function BetForm({
             type="number"
             step="1000"
             min="1000"
+            value={stake}
+            onChange={(e) => setStake(e.target.value)}
             placeholder="예: 30000"
             required
           />
         </div>
 
         <div>
-          <label htmlFor="placedBy">건 사람</label>
-          <input id="placedBy" name="placedBy" type="text" placeholder="예: 철수" required />
-        </div>
-
-        <div>
           <label htmlFor="note">메모 (선택)</label>
           <input id="note" name="note" type="text" placeholder="비고" />
         </div>
+
+        {expected != null && (
+          <div className="full payout-preview">
+            예상 수령액 <b>{expected.toLocaleString('ko-KR')}원</b>
+            <span className="muted">
+              {' '}
+              (순이익 +{(expected - Math.round(stakeNum)).toLocaleString('ko-KR')}원)
+            </span>
+          </div>
+        )}
 
         <div className="full btn-row">
           <SubmitButton />

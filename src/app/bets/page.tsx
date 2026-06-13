@@ -1,4 +1,4 @@
-import { listBets, summarize } from '@/lib/bets/store';
+import { listBetsSettled, summarize } from '@/lib/bets/store';
 import { getMatches, getOdds } from '@/lib/data-sources';
 import { BetForm, type OddsTriple } from '@/components/BetForm';
 import { SettleBet } from '@/components/SettleBet';
@@ -26,16 +26,26 @@ function won(n: number) {
   return `${n.toLocaleString('ko-KR')}원`;
 }
 
+// 일시 = 베팅 등록 시각(createdAt)을 한국시간으로 컴팩트하게.
+function fmtWhen(iso: string): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(iso));
+}
+
 export default async function BetsPage({
   searchParams,
 }: {
   searchParams?: { match?: string };
 }) {
-  const [bets, { matches }, { odds }] = await Promise.all([
-    listBets(),
-    getMatches(),
-    getOdds(),
-  ]);
+  const [{ matches }, { odds }] = await Promise.all([getMatches(), getOdds()]);
+  // 종료된 경기의 PENDING 베팅은 결과대로 자동 정산.
+  const bets = await listBetsSettled(matches);
   const initialMatchId = searchParams?.match;
   const stats = summarize(bets);
 
@@ -94,7 +104,6 @@ export default async function BetsPage({
               <tr>
                 <th>일시</th>
                 <th>경기</th>
-                <th>건 사람</th>
                 <th>선택</th>
                 <th>배당</th>
                 <th>금액</th>
@@ -107,15 +116,9 @@ export default async function BetsPage({
               {bets.map((b) => (
                 <tr key={b.id}>
                   <td className="muted" style={{ whiteSpace: 'nowrap' }}>
-                    {new Date(b.createdAt).toLocaleString('ko-KR', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {fmtWhen(b.createdAt)}
                   </td>
                   <td>{matchName.get(b.matchId) ?? b.matchId}</td>
-                  <td>{b.placedBy}</td>
                   <td>{pickLabel[b.pick] ?? b.pick}</td>
                   <td>{b.oddsAtPlacement.toFixed(2)}</td>
                   <td>{won(b.stake)}</td>

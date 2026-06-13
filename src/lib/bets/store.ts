@@ -5,16 +5,18 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import type { Bet } from '@/lib/types';
+import { cache } from 'react';
+import type { Bet, Match, Outcome } from '@/lib/types';
 import { SEED_BETS } from '@/lib/pool/config';
 import { isSupabaseConfigured, getSupabaseServer } from '@/lib/db/supabase';
 
-export type NewBet = Omit<Bet, 'id' | 'status' | 'createdAt'> &
-  Partial<Pick<Bet, 'status'>>;
+// placedBy(건 사람)는 공동자금이라 더 이상 입력받지 않는다 — 없으면 '공동' 기본.
+export type NewBet = Omit<Bet, 'id' | 'status' | 'createdAt' | 'placedBy'> &
+  Partial<Pick<Bet, 'status' | 'placedBy'>>;
 
 // ── 공개 API (백엔드 자동 선택) ──────────────────────────
 
-export async function listBets(): Promise<Bet[]> {
+export const listBets = cache(async (): Promise<Bet[]> => {
   if (isSupabaseConfigured()) {
     try {
       return await sbListBets();
@@ -25,6 +27,46 @@ export async function listBets(): Promise<Bet[]> {
     }
   }
   return fileListBets();
+});
+
+/** 경기 결과(승/무/패). 스코어 없으면 null. */
+function outcomeOf(m: Match): Outcome | null {
+  if (m.status !== 'FINISHED' || !m.score) return null;
+  if (m.score.home > m.score.away) return 'HOME';
+  if (m.score.home < m.score.away) return 'AWAY';
+  return 'DRAW';
+}
+
+/**
+ * 베팅 목록을 조회하되, 경기가 종료된 PENDING 베팅을 결과대로 자동 정산한다.
+ * - 적중: payout = round(stake × 배당), status WON / 미적중: 0, LOST.
+ * - VOID·수정은 기존 수동 정산(SettleBet)으로.
+ */
+export async function listBetsSettled(matches: Match[]): Promise<Bet[]> {
+  const bets = await listBets();
+  const byId = new Map(matches.map((m) => [m.id, m]));
+  const out: Bet[] = [];
+  for (const b of bets) {
+    if (b.status === 'PENDING') {
+      const m = byId.get(b.matchId);
+      const result = m ? outcomeOf(m) : null;
+      if (result) {
+        const won = result === b.pick;
+        const patch: Partial<Bet> = won
+          ? { status: 'WON', payout: Math.round(b.stake * b.oddsAtPlacement) }
+          : { status: 'LOST', payout: 0 };
+        try {
+          await updateBet(b.id, patch);
+          out.push({ ...b, ...patch });
+          continue;
+        } catch (err) {
+          console.warn('[store] 자동 정산 실패(무시):', err);
+        }
+      }
+    }
+    out.push(b);
+  }
+  return out;
 }
 
 export async function addBet(input: NewBet): Promise<Bet> {
@@ -107,7 +149,7 @@ async function sbAddBet(input: NewBet): Promise<Bet> {
     .from('bets')
     .insert({
       match_id: input.matchId,
-      placed_by: input.placedBy,
+      placed_by: input.placedBy ?? '공동',
       pick: input.pick,
       odds_at_placement: input.oddsAtPlacement,
       stake: input.stake,
@@ -177,6 +219,7 @@ async function fileAddBet(input: NewBet): Promise<Bet> {
   const bets = await readAll();
   const bet: Bet = {
     ...input,
+    placedBy: input.placedBy ?? '공동',
     id: randomUUID(),
     status: input.status ?? 'PENDING',
     createdAt: new Date().toISOString(),

@@ -3,6 +3,7 @@
 // 이렇게 하면 "무료 API → 유료 API → 정적 데이터" 폴백 전략을 한 곳에서 관리할 수 있다.
 
 import type { Match, Odds } from '@/lib/types';
+import { cache } from 'react';
 import { fetchWorldCupFixtures } from './openfootball';
 import {
   fetchWorldcup26Matches,
@@ -29,7 +30,11 @@ import { listOdds, upsertOdds } from '@/lib/odds/store';
  * - football-data 키가 있으면 실시간 상태/스코어가 포함된 데이터를 우선 사용.
  * - 키가 없거나 실패하면 openfootball 정적 일정으로 폴백.
  */
-export async function getMatches(): Promise<{
+// React cache(): 한 번의 요청(렌더) 안에서 중복 호출을 메모이즈한다.
+// (페이지가 getMatches() 와 getOdds()[내부에서 다시 getMatches()]를 호출 → 캐시로 1회만 실행)
+export const getMatches = cache(_getMatches);
+
+async function _getMatches(): Promise<{
   matches: Match[];
   source: string;
 }> {
@@ -79,7 +84,9 @@ export interface OddsResult {
   api: boolean; // 자동 배당 API(The Odds API) 활성
 }
 
-export async function getOdds(): Promise<OddsResult> {
+export const getOdds = cache(_getOdds);
+
+async function _getOdds(): Promise<OddsResult> {
   const scraper = isBetmanEnabled();
   const api = isOddsApiConfigured();
   const [dbOdds, { matches }] = await Promise.all([listOdds(), getMatches()]);
@@ -98,8 +105,9 @@ export async function getOdds(): Promise<OddsResult> {
     try {
       const fresh = await fetchWorldCupOdds(matches);
       for (const o of fresh) if (!map.has(o.matchId)) map.set(o.matchId, o);
-      // 라이브에서 받은 배당을 스냅샷으로 저장 → 경기 종료 후에도 계속 표시한다.
-      await snapshotOdds(fresh, manual, snapshot);
+      // 라이브 배당 스냅샷 저장은 렌더를 막지 않도록 비차단(fire-and-forget).
+      // 값이 바뀐 경우에만 쓰므로 대개 무동작이고, 다음 렌더가 재시도해 결국 영속화된다.
+      void snapshotOdds(fresh, manual, snapshot).catch(() => {});
     } catch (err) {
       console.warn('[data] The Odds API 실패(무시):', err);
     }
@@ -108,17 +116,15 @@ export async function getOdds(): Promise<OddsResult> {
   // 종료되어 라이브 API 에서 빠진 경기는 마지막 스냅샷 배당으로 채운다.
   for (const [id, o] of snapshot) if (!map.has(id)) map.set(id, o);
 
-  // 이미 종료됐는데 라이브/스냅샷 모두 없는 경기는 과거(historical) 배당으로 1회 백필한다.
-  if (api) {
+  // 이미 종료됐는데 배당이 없는 경기를 과거(historical) 배당으로 백필.
+  // ⚠️ 유료 플랜 전용 + 호출당 지연이 커서 기본 비활성(ENABLE_HISTORICAL_ODDS=true 일 때만).
+  // 활성화돼도 렌더를 막지 않도록 비차단으로 돌린다(다음 렌더에서 결과 반영).
+  if (api && process.env.ENABLE_HISTORICAL_ODDS === 'true') {
     const missing = matches.filter(
       (m) => m.status === 'FINISHED' && !map.has(m.id),
     );
     if (missing.length > 0) {
-      try {
-        await backfillHistoricalOdds(missing, matches, map);
-      } catch (err) {
-        console.warn('[data] 과거 배당 백필 실패(무시):', err);
-      }
+      void backfillHistoricalOdds(missing, matches, new Map(map)).catch(() => {});
     }
   }
 

@@ -106,17 +106,17 @@ interface StageMeta {
   order: number; // 진행 순서(조별리그=0 … 결승=5)
 }
 
-/** 토너먼트 스테이지 문자열 → 한글 라벨/순서. 조별리그면 null. */
+/** 토너먼트 스테이지 문자열/코드 → 한글 라벨/순서. 조별리그면 null. */
 function knockoutMeta(stage?: string): StageMeta | null {
   if (!stage) return null;
   const s = stage.toLowerCase().replace(/[\s._-]/g, '');
-  // ‘final’ 이 부분문자열로 겹치므로 3·4위전/4강/8강을 먼저 검사한다.
-  if (/third|3rd|bronze/.test(s)) return { label: '3·4위전', order: 4.5 };
-  if (/semi|round4|4강/.test(s)) return { label: '4강', order: 4 };
-  if (/quarter|round8|8강/.test(s)) return { label: '8강', order: 3 };
-  if (/16/.test(s)) return { label: '16강', order: 2 };
-  if (/32/.test(s)) return { label: '32강', order: 1 };
-  if (/final|결승/.test(s)) return { label: '결승', order: 5 };
+  // ‘qf/sf/final’ 의 'f' 오매칭과 부분문자열 겹침 방지를 위해 좁은 패턴부터 검사.
+  if (/third|3rd|bronze|^3p$|^tp$/.test(s)) return { label: '3·4위전', order: 4.5 };
+  if (/semi|^sf$|round4|4강/.test(s)) return { label: '4강', order: 4 };
+  if (/quarter|^qf$|round8|8강/.test(s)) return { label: '8강', order: 3 };
+  if (/^r?16$|round16|roundof16|last16|16강/.test(s)) return { label: '16강', order: 2 };
+  if (/^r?32$|round32|roundof32|last32|32강/.test(s)) return { label: '32강', order: 1 };
+  if (/^f$|final|결승/.test(s)) return { label: '결승', order: 5 };
   return null;
 }
 

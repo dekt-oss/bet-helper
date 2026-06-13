@@ -5,15 +5,19 @@ import { BetmanImport } from '@/components/BetmanImport';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { buildMatchOptions } from '@/lib/teams/options';
 import { type OddsTriple } from '@/components/BetForm';
+import { listOpinions, groupByMatch } from '@/lib/opinions/store';
+import { MEMBERS } from '@/lib/pool/config';
 
 export const dynamic = 'force-dynamic';
 
 export default async function OddsPage() {
-  const [{ matches }, { odds, scraper, api }] = await Promise.all([
+  const [{ matches }, { odds, scraper, api }, opinions] = await Promise.all([
     getMatches(),
     getOdds(),
+    listOpinions(),
   ]);
   const options = buildMatchOptions(matches);
+  const opinionsByMatch = groupByMatch(opinions);
 
   const oddsByMatch: Record<string, OddsTriple> = {};
   for (const o of odds) {
@@ -36,11 +40,16 @@ export default async function OddsPage() {
       </div>
       <p className="muted">
         승/무/패(1X2) · 자동 배당 {api ? '켜짐(The Odds API)' : '꺼짐'}
-        {scraper ? ' · 베트맨 스크래퍼 켜짐' : ''} · 배당을 누르면 바로 베팅 등록
+        {scraper ? ' · 베트맨 스크래퍼 켜짐' : ''} · 경기를 누르면 상세·3인 의견·베팅
       </p>
 
-      {/* 배팅사이트 스타일 보드 — 경기 카드 + 승/무/패 배당 버튼(클릭 시 인라인 베팅) */}
-      <OddsBoard matches={options} oddsByMatch={oddsByMatch} />
+      {/* 배팅사이트 스타일 보드 — 카드 클릭 시 상세(랭킹/선수)·3인 의견·인라인 베팅 */}
+      <OddsBoard
+        matches={options}
+        oddsByMatch={oddsByMatch}
+        opinionsByMatch={opinionsByMatch}
+        members={MEMBERS}
+      />
 
       {/* 보조: 베트맨 배당 수동 입력/가져오기 */}
       <details className="odds-tools" style={{ marginTop: 28 }}>

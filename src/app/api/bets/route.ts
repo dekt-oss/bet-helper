@@ -14,17 +14,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: '잘못된 JSON 입니다.' }, { status: 400 });
   }
 
-  const { matchId, placedBy, pick, oddsAtPlacement, stake } = body;
-  if (!matchId || !placedBy || !pick || !oddsAtPlacement || !stake) {
+  const { matchId, pick, oddsAtPlacement, stake } = body;
+  if (!matchId || !pick || !oddsAtPlacement || !stake) {
     return NextResponse.json(
-      { error: 'matchId, placedBy, pick, oddsAtPlacement, stake 는 필수입니다.' },
+      { error: 'matchId, pick, oddsAtPlacement, stake 는 필수입니다.' },
       { status: 400 },
     );
   }
 
   const bet = await addBet({
     matchId,
-    placedBy,
+    placedBy: body.placedBy, // 선택 — 없으면 '공동'
     pick,
     oddsAtPlacement,
     stake,

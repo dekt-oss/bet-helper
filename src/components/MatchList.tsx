@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { Match } from '@/lib/types';
 import { toKoreanTeam, isKoreaMatch, koreanGroupName } from '@/lib/teams/korea';
 
@@ -68,7 +69,7 @@ function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
   const group = koreanGroupName(m.stage);
 
   return (
-    <div className={`match-item ${open ? 'open' : ''}`}>
+    <div className={`match-item ${open ? 'open' : ''} ${korea ? 'kr' : ''}`}>
       <div
         className="match-row"
         role="button"
@@ -89,9 +90,7 @@ function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
             {toKoreanTeam(m.home.name)} <span className="muted">vs</span>{' '}
             {toKoreanTeam(m.away.name)}
           </div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-            {formatKickoff(m.kickoff)}
-          </div>
+          <div className="match-date">{formatKickoff(m.kickoff)}</div>
           {odds && <OddsChips odds={odds} />}
         </div>
         <div className="match-row-right">
@@ -120,6 +119,7 @@ function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
       </div>
 
       {open && (
+        <>
         <dl className="match-detail">
           <div>
             <dt>일시</dt>
@@ -192,6 +192,12 @@ function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
             </div>
           )}
         </dl>
+        <div className="match-detail-actions">
+          <Link href={`/bets?match=${encodeURIComponent(m.id)}`} className="bet-link">
+            🎯 이 경기 베팅하기 →
+          </Link>
+        </div>
+        </>
       )}
     </div>
   );

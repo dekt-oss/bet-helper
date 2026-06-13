@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getMatches, getOdds } from '@/lib/data-sources';
-import { listBets } from '@/lib/bets/store';
+import { listBetsSettled } from '@/lib/bets/store';
 import { computePoolBalance } from '@/lib/pool/balance';
 import { MatchList, type OddsTriple } from '@/components/MatchList';
 import { AutoRefresh } from '@/components/AutoRefresh';
@@ -21,11 +21,11 @@ const statusLabel: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const [{ matches, source }, bets, { odds }] = await Promise.all([
+  const [{ matches, source }, { odds }] = await Promise.all([
     getMatches(),
-    listBets(),
     getOdds(),
   ]);
+  const bets = await listBetsSettled(matches);
   const pool = computePoolBalance(bets);
 
   const oddsByMatch: Record<string, OddsTriple> = {};

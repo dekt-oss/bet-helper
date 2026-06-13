@@ -48,6 +48,21 @@ test('32강에 진행중 경기가 있으면 32강이 맨 위', () => {
   );
 });
 
+test('worldcup26 표준 토큰 스테이지가 Group 카드로 안 샘', () => {
+  // worldcup26 mapStage 가 R32/SF/F → round32/semi/final 로 변환해 넘겨준다.
+  const sections = computeStageSections([
+    mk('a', 'round32', 'SCHEDULED'),
+    mk('b', 'quarter', 'SCHEDULED'),
+    mk('c', 'semi', 'SCHEDULED'),
+    mk('d', 'final', 'SCHEDULED'),
+  ]);
+  const titles = sections.map((s) => s.title);
+  for (const t of ['32강', '8강', '4강', '결승'])
+    assert.ok(titles.includes(t), `missing ${t}`);
+  assert.ok(!titles.some((t) => t.startsWith('Group')));
+  assert.ok(!sections.some((s) => s.kind === 'group'));
+});
+
 test('스테이지 한글 라벨 매핑(16강/8강/4강/결승)', () => {
   const titles = computeStageSections([
     mk('a', 'round16', 'SCHEDULED'),

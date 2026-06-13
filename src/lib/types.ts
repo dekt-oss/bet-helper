@@ -59,6 +59,16 @@ export interface Odds {
   source: DataSourceId;
 }
 
+/** 경기별 멤버 의견(합의용). 3인이 같은 pick 이면 합의. */
+export interface Opinion {
+  matchId: string;
+  member: string;
+  /** 예상 결과(승/무/패). 미정이면 빈 문자열. */
+  pick: Outcome | '';
+  comment?: string;
+  updatedAt: string;
+}
+
 export type DataSourceId =
   | 'openfootball'
   | 'football-data'

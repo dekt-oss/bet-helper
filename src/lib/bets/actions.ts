@@ -24,14 +24,12 @@ export async function createBetAction(
   formData: FormData,
 ): Promise<ActionState> {
   const matchId = String(formData.get('matchId') ?? '').trim();
-  const placedBy = String(formData.get('placedBy') ?? '').trim();
   const pick = String(formData.get('pick') ?? '') as Outcome;
   const oddsAtPlacement = num(formData.get('oddsAtPlacement'));
   const stake = num(formData.get('stake'));
   const note = String(formData.get('note') ?? '').trim() || undefined;
 
   if (!matchId) return { ok: false, error: '경기를 선택하세요.' };
-  if (!placedBy) return { ok: false, error: '건 사람을 입력하세요.' };
   if (!OUTCOMES.includes(pick))
     return { ok: false, error: '승/무/패를 선택하세요.' };
   if (!Number.isFinite(oddsAtPlacement) || oddsAtPlacement <= 0)
@@ -42,7 +40,6 @@ export async function createBetAction(
   try {
     await addBet({
       matchId,
-      placedBy,
       pick,
       oddsAtPlacement,
       stake: Math.round(stake),

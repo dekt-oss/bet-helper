@@ -5,6 +5,7 @@ import {
   parseScorers,
   deriveStatus,
   stadiumOffsetMin,
+  mapStage,
 } from './worldcup26';
 import { teamCanon } from '@/lib/teams/korea';
 
@@ -56,6 +57,15 @@ test('stadiumOffsetMin: 개최지별 6월 UTC 오프셋', () => {
   assert.equal(stadiumOffsetMin('SoFi Stadium', 'Los Angeles'), -420); // PDT
   assert.equal(stadiumOffsetMin('BC Place', 'Vancouver'), -420);
   assert.equal(stadiumOffsetMin('Unknown Arena', 'Nowhere'), undefined); // 폴백
+});
+
+test('mapStage: 조별리그 vs 토너먼트 라운드코드 구분', () => {
+  assert.equal(mapStage('A', 'group'), 'Group A');
+  assert.equal(mapStage('F', 'group'), 'Group F'); // Group F (조별리그)
+  assert.equal(mapStage('R32', 'group'), 'round32'); // 라운드코드는 변환
+  assert.equal(mapStage('SF', 'group'), 'semi');
+  assert.equal(mapStage('F', 'final'), 'final'); // 결승은 type 으로 구분
+  assert.equal(mapStage('R16', 'round16'), 'round16');
 });
 
 test('팀 매칭: Bosnia & Herzegovina / DR Congo 표준화', () => {
