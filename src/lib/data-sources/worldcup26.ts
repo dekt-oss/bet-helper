@@ -19,6 +19,14 @@ export function isWorldcup26Enabled(): boolean {
   return process.env.WORLDCUP26_DISABLED !== 'true';
 }
 
+// 일부 사이트는 기본 fetch UA 를 봇으로 보고 403 을 준다 → 브라우저처럼 위장.
+const COMMON_HEADERS: Record<string, string> = {
+  'user-agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  accept: 'application/json, text/plain, */*',
+  'accept-language': 'en-US,en;q=0.9',
+};
+
 // ── 인증(JWT) ────────────────────────────────────────────
 // 토큰을 모듈 스코프에 캐시한다(웜 람다 재사용). 50분 후 만료로 간주해 재발급.
 let cachedToken: { value: string; expiresAt: number } | null = null;
@@ -39,7 +47,7 @@ function pickToken(body: unknown): string | null {
 async function authenticate(): Promise<string | null> {
   const res = await fetch(`${BASE}/auth/authenticate`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { ...COMMON_HEADERS, 'content-type': 'application/json' },
     body: JSON.stringify({ username: USERNAME, email: EMAIL, password: PASSWORD }),
     cache: 'no-store',
   });
@@ -52,7 +60,7 @@ async function register(): Promise<void> {
   try {
     await fetch(`${BASE}/auth/register`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { ...COMMON_HEADERS, 'content-type': 'application/json' },
       body: JSON.stringify({ username: USERNAME, email: EMAIL, password: PASSWORD }),
       cache: 'no-store',
     });
@@ -79,7 +87,7 @@ async function apiGet<T>(path: string, revalidate: number): Promise<T> {
   const token = await getToken();
   if (!token) throw new Error('worldcup26: 인증 토큰을 받지 못했습니다');
   const res = await fetch(`${BASE}${path}`, {
-    headers: { authorization: `Bearer ${token}` },
+    headers: { ...COMMON_HEADERS, authorization: `Bearer ${token}` },
     next: { revalidate },
   });
   if (res.status === 401) {
@@ -208,6 +216,83 @@ async function fetchStadiums(): Promise<Map<string, string>> {
   } catch (err) {
     console.warn('[worldcup26] 경기장 조회 실패(무시):', err);
     return new Map();
+  }
+}
+
+// ── 진단(디버그) ─────────────────────────────────────────
+// 운영에서 실제 응답 상태를 확인하기 위한 헬퍼. 민감정보(토큰)는 노출하지 않는다.
+
+export interface Wc26Diag {
+  base: string;
+  username: string;
+  authStatus: number | null;
+  authBodySnippet?: string;
+  registerStatus: number | null;
+  tokenObtained: boolean;
+  gamesStatus: number | null;
+  gamesCount: number | null;
+  firstGame?: unknown;
+  error?: string;
+}
+
+async function rawPost(path: string): Promise<Response> {
+  return fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { ...COMMON_HEADERS, 'content-type': 'application/json' },
+    body: JSON.stringify({ username: USERNAME, email: EMAIL, password: PASSWORD }),
+    cache: 'no-store',
+  });
+}
+
+export async function diagnoseWorldcup26(): Promise<Wc26Diag> {
+  const diag: Wc26Diag = {
+    base: BASE,
+    username: USERNAME,
+    authStatus: null,
+    registerStatus: null,
+    tokenObtained: false,
+    gamesStatus: null,
+    gamesCount: null,
+  };
+  try {
+    let authRes = await rawPost('/auth/authenticate');
+    diag.authStatus = authRes.status;
+    let body = await authRes.clone().text();
+    let token = pickToken(safeJson(body));
+
+    if (!token) {
+      const reg = await rawPost('/auth/register');
+      diag.registerStatus = reg.status;
+      authRes = await rawPost('/auth/authenticate');
+      diag.authStatus = authRes.status;
+      body = await authRes.clone().text();
+      token = pickToken(safeJson(body));
+    }
+    diag.authBodySnippet = body.slice(0, 200);
+    diag.tokenObtained = Boolean(token);
+
+    if (token) {
+      const gamesRes = await fetch(`${BASE}/get/games`, {
+        headers: { ...COMMON_HEADERS, authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      diag.gamesStatus = gamesRes.status;
+      const gtext = await gamesRes.text();
+      const parsed = safeJson(gtext) as { games?: unknown[] } | null;
+      diag.gamesCount = Array.isArray(parsed?.games) ? parsed!.games!.length : null;
+      diag.firstGame = parsed?.games?.[0] ?? gtext.slice(0, 200);
+    }
+  } catch (err) {
+    diag.error = err instanceof Error ? err.message : String(err);
+  }
+  return diag;
+}
+
+function safeJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
   }
 }
 
