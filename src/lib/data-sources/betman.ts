@@ -46,13 +46,25 @@ const JSON_FIELDS = {
 // (소문자·공백/괄호 제거)이며, 한글명과 영문 변형을 모두 같은 표준값으로 모은다.
 // 필요 시 점진적으로 채운다.
 const TEAM_ALIASES: Record<string, string> = {
+  // 한글 ↔ 영문 변형을 같은 표준값으로 수렴. 베트맨은 한글, 우리 일정(openfootball)은 영문.
+  // 대한민국
   대한민국: 'korea',
   한국: 'korea',
   korearepublic: 'korea',
   republicofkorea: 'korea',
   southkorea: 'korea',
+  // 남미
   브라질: 'brazil',
   아르헨티나: 'argentina',
+  우루과이: 'uruguay',
+  콜롬비아: 'colombia',
+  에콰도르: 'ecuador',
+  파라과이: 'paraguay',
+  페루: 'peru',
+  칠레: 'chile',
+  볼리비아: 'bolivia',
+  베네수엘라: 'venezuela',
+  // 유럽
   프랑스: 'france',
   독일: 'germany',
   스페인: 'spain',
@@ -62,13 +74,58 @@ const TEAM_ALIASES: Record<string, string> = {
   이탈리아: 'italy',
   벨기에: 'belgium',
   크로아티아: 'croatia',
+  스위스: 'switzerland',
+  오스트리아: 'austria',
+  폴란드: 'poland',
+  덴마크: 'denmark',
+  노르웨이: 'norway',
+  스웨덴: 'sweden',
+  우크라이나: 'ukraine',
+  세르비아: 'serbia',
+  스코틀랜드: 'scotland',
+  웨일스: 'wales',
+  터키: 'turkey',
+  튀르키예: 'turkey',
+  turkiye: 'turkey',
+  체코: 'czechrepublic',
+  체코공화국: 'czechrepublic',
+  czechia: 'czechrepublic',
+  // 아시아
   일본: 'japan',
+  이란: 'iran',
+  사우디아라비아: 'saudiarabia',
+  사우디: 'saudiarabia',
+  카타르: 'qatar',
+  호주: 'australia',
+  오스트레일리아: 'australia',
+  우즈베키스탄: 'uzbekistan',
+  요르단: 'jordan',
+  // 북중미·카리브
   멕시코: 'mexico',
   미국: 'usa',
   unitedstates: 'usa',
+  us: 'usa',
   캐나다: 'canada',
-  우루과이: 'uruguay',
+  코스타리카: 'costarica',
+  파나마: 'panama',
+  자메이카: 'jamaica',
+  온두라스: 'honduras',
+  아이티: 'haiti',
+  // 아프리카
   모로코: 'morocco',
+  세네갈: 'senegal',
+  가나: 'ghana',
+  나이지리아: 'nigeria',
+  카메룬: 'cameroon',
+  이집트: 'egypt',
+  알제리: 'algeria',
+  튀니지: 'tunisia',
+  코트디부아르: 'ivorycoast',
+  남아프리카공화국: 'southafrica',
+  남아공: 'southafrica',
+  카보베르데: 'capeverde',
+  // 오세아니아
+  뉴질랜드: 'newzealand',
 };
 
 // ── 공개 API ──────────────────────────────────────────────
@@ -144,7 +201,8 @@ export function parseBetmanGameSlip(raw: string): Odds[] {
   const keys = cs.keys as string[];
   const idx = (k: string) => keys.indexOf(k);
   const iItem = idx('itemCode');
-  const iGame = idx('gameName');
+  // 월드컵 여부는 leagueName('축구 월드컵')에 있다. gameName 은 보통 null.
+  const iLeague = idx('leagueName');
   const iHome = idx('homeName');
   const iAway = idx('awayName');
   const iWin = idx('winAllot');
@@ -157,8 +215,8 @@ export function parseBetmanGameSlip(raw: string): Odds[] {
   const out: Odds[] = [];
   for (const row of cs.datas as unknown[][]) {
     if (iItem >= 0 && row[iItem] !== 'SC') continue; // 축구만
-    if (iBet >= 0 && row[iBet] !== '승무패') continue; // 1X2 마켓만
-    if (iGame >= 0 && !String(row[iGame] ?? '').includes('월드컵')) continue;
+    if (iBet >= 0 && row[iBet] !== '승무패') continue; // 1X2 마켓만(핸디캡 등 제외)
+    if (iLeague >= 0 && !String(row[iLeague] ?? '').includes('월드컵')) continue;
 
     const home = str(row[iHome]);
     const away = str(row[iAway]);

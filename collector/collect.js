@@ -35,12 +35,13 @@ const cfg = {
   ingestToken: process.env.ODDS_INGEST_TOKEN ?? '',
 
   homeUrl: process.env.BETMAN_HOME_URL ?? 'https://www.betman.co.kr/',
-  // 회원 전용(승부식) 페이지 — 로그인 여부 판별 & 배당 캡처 대상
+  // 승부식 슬립 페이지 — 열면 페이지 JS 가 배당 데이터(gameInfoInq.do, JSON)를 XHR 로 불러온다.
+  // gmId=G101 은 '프로토 승부식'(고정). gmTs(회차)는 생략 시 현재 회차로 로드된다.
   protoUrl:
     process.env.BETMAN_PROTO_URL ??
-    'https://www.betman.co.kr/main/mainPage/gamebuy/gameBuyMain.do',
+    'https://www.betman.co.kr/main/mainPage/gamebuy/gameSlip.do?gmId=G101',
   // 캡처 대상 응답 URL 부분 일치(콤마). 비워도 본문에 compSchedules 있으면 자동 인식.
-  slipUrlMatch: (process.env.GAMESLIP_URL_MATCH ?? 'gameSlip.do,protoMatchList.do')
+  slipUrlMatch: (process.env.GAMESLIP_URL_MATCH ?? 'gameInfoInq.do,inqMainGameInfo.do,gameSlip.do')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
