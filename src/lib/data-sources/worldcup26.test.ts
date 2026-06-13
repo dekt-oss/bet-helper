@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toKickoffIso, parseScorers, deriveStatus } from './worldcup26';
+import {
+  toKickoffIso,
+  parseScorers,
+  deriveStatus,
+  stadiumOffsetMin,
+} from './worldcup26';
 import { teamCanon } from '@/lib/teams/korea';
 
 type WcGameArg = Parameters<typeof deriveStatus>[0];
@@ -40,6 +45,17 @@ test('deriveStatus: 다양한 진행상태', () => {
   assert.equal(s({ finished: 'FALSE', time_elapsed: 'notstarted' }), 'SCHEDULED');
   assert.equal(s({ finished: 'FALSE', time_elapsed: 'HT' }), 'PAUSED');
   assert.equal(s({ finished: 'FALSE', time_elapsed: '67' }), 'LIVE');
+});
+
+test('stadiumOffsetMin: 개최지별 6월 UTC 오프셋', () => {
+  assert.equal(stadiumOffsetMin('Estadio Akron', 'Guadalajara'), -360); // 멕시코
+  assert.equal(stadiumOffsetMin('Estadio Azteca', 'Mexico City'), -360);
+  assert.equal(stadiumOffsetMin('MetLife Stadium', 'East Rutherford, NJ'), -240); // EDT
+  assert.equal(stadiumOffsetMin('Mercedes-Benz Stadium', 'Atlanta'), -240);
+  assert.equal(stadiumOffsetMin('AT&T Stadium', 'Arlington'), -300); // CDT
+  assert.equal(stadiumOffsetMin('SoFi Stadium', 'Los Angeles'), -420); // PDT
+  assert.equal(stadiumOffsetMin('BC Place', 'Vancouver'), -420);
+  assert.equal(stadiumOffsetMin('Unknown Arena', 'Nowhere'), undefined); // 폴백
 });
 
 test('팀 매칭: Bosnia & Herzegovina / DR Congo 표준화', () => {

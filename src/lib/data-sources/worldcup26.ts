@@ -156,6 +156,28 @@ const TZ_OFFSET_MIN = Number(
   process.env.WORLDCUP26_TZ_OFFSET_MINUTES ?? -360,
 );
 
+// 2026 월드컵 16개 개최지의 6월(여름) UTC 오프셋(분).
+//  - 멕시코(아즈테카/아크론/BBVA): UTC-6, DST 없음.
+//  - US 동부/캐나다 동부(애틀랜타·보스턴·마이애미·뉴욕/뉴저지·필라델피아·토론토): EDT, UTC-4
+//  - US 중부(댈러스·휴스턴·캔자스시티): CDT, UTC-5
+//  - US 서부/캐나다 서부(LA·샌프란시스코·시애틀·밴쿠버): PDT, UTC-7
+// 경기장 이름/도시 키워드로 매칭. 못 찾으면 undefined → 기본 오프셋(TZ_OFFSET_MIN) 폴백.
+export function stadiumOffsetMin(
+  name?: string,
+  city?: string,
+): number | undefined {
+  const hay = `${name ?? ''} ${city ?? ''}`.toLowerCase();
+  if (/los angeles|sofi|san francisco|santa clara|levi|seattle|lumen|vancouver|bc place/.test(hay))
+    return -420; // PDT
+  if (/dallas|arlington|at&t|at and t|houston|nrg|kansas city|arrowhead/.test(hay))
+    return -300; // CDT
+  if (/atlanta|mercedes-benz|boston|foxborough|gillette|miami|hard rock|new york|new jersey|rutherford|metlife|philadelphia|lincoln financial|toronto|bmo/.test(hay))
+    return -240; // EDT
+  if (/mexico|azteca|guadalajara|akron|monterrey|bbva/.test(hay))
+    return -360; // 멕시코(CST, DST 없음)
+  return undefined;
+}
+
 export function toKickoffIso(
   local?: string,
   offsetMin: number = TZ_OFFSET_MIN,
@@ -201,23 +223,30 @@ function toTeam(name: string | undefined, id: string | undefined): Team {
   return { id: id ?? name ?? 'TBD', name: name ?? '미정' };
 }
 
-function gameToMatch(g: WcGame, venues: Map<string, string>): Match {
+interface VenueInfo {
+  name: string;
+  offset?: number; // 개최지 UTC 오프셋(분). 못 구하면 기본값 폴백.
+}
+
+function gameToMatch(g: WcGame, venues: Map<string, VenueInfo>): Match {
   const status = deriveStatus(g);
   const started = status !== 'SCHEDULED';
   const homeScorers = parseScorers(g.home_scorers);
   const awayScorers = parseScorers(g.away_scorers);
   const hasScorers = homeScorers.length > 0 || awayScorers.length > 0;
+  const venue = g.stadium_id ? venues.get(g.stadium_id) : undefined;
   return {
     id: `wc2026-${g.id}`,
     competition: 'FIFA World Cup 2026',
     stage: g.group ? `Group ${g.group}` : (g.type ?? undefined),
-    kickoff: toKickoffIso(g.local_date),
+    // 개최지별 시간대로 환산(없으면 기본 -360).
+    kickoff: toKickoffIso(g.local_date, venue?.offset ?? TZ_OFFSET_MIN),
     status,
     minute: deriveMinute(g),
     home: toTeam(g.home_team_name_en, g.home_team_id),
     away: toTeam(g.away_team_name_en, g.away_team_id),
     score: started ? { home: num(g.home_score), away: num(g.away_score) } : undefined,
-    venue: g.stadium_id ? venues.get(g.stadium_id) : undefined,
+    venue: venue?.name,
     matchday: g.matchday,
     scorers: hasScorers ? { home: homeScorers, away: awayScorers } : undefined,
     source: 'worldcup26',
@@ -226,16 +255,20 @@ function gameToMatch(g: WcGame, venues: Map<string, string>): Match {
 
 // ── 공개 API ─────────────────────────────────────────────
 
-/** 경기장 id → 이름 맵. (실패 시 빈 맵) */
-async function fetchStadiums(): Promise<Map<string, string>> {
+/** 경기장 id → {이름, 시간대 오프셋} 맵. (실패 시 빈 맵) */
+async function fetchStadiums(): Promise<Map<string, VenueInfo>> {
   try {
     const body = await apiGet<unknown>('/get/stadiums', 86400);
     const list: WcStadium[] = Array.isArray(body)
       ? (body as WcStadium[])
       : (((body as { stadiums?: WcStadium[] })?.stadiums ?? []) as WcStadium[]);
-    const map = new Map<string, string>();
+    const map = new Map<string, VenueInfo>();
     for (const s of list) {
-      if (s?.id && s.name_en) map.set(String(s.id), s.name_en);
+      if (s?.id && s.name_en)
+        map.set(String(s.id), {
+          name: s.name_en,
+          offset: stadiumOffsetMin(s.name_en, s.city_en),
+        });
     }
     return map;
   } catch (err) {
