@@ -76,10 +76,12 @@ const c = {
   date: idx('gameDate'),
 };
 const okOdd = (v) => Number.isFinite(Number(v)) && Number(v) > 1 && Number(v) <= 100;
+const cBet1 = idx('betId');
 const extracted = datas.filter(
   (r) =>
     r[c.item] === 'SC' &&
     r[c.bet] === '승무패' &&
+    String(r[cBet1]) === '1' && // 정규시간만(전반 승무패 제외)
     String(r[c.league] ?? '').includes('월드컵') &&
     okOdd(r[c.win]) &&
     okOdd(r[c.draw]) &&

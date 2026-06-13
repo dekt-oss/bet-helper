@@ -126,6 +126,10 @@ const TEAM_ALIASES: Record<string, string> = {
   카보베르데: 'capeverde',
   // 오세아니아
   뉴질랜드: 'newzealand',
+  // 기타
+  퀴라소: 'curacao',
+  보스니아헤르체고비나: 'bosniaandherzegovina',
+  보스니아: 'bosniaandherzegovina',
 };
 
 // ── 공개 API ──────────────────────────────────────────────
@@ -209,6 +213,7 @@ export function parseBetmanGameSlip(raw: string): Odds[] {
   const iDraw = idx('drawAllot');
   const iLose = idx('loseAllot');
   const iBet = idx('betTypNm');
+  const iBetId = idx('betId'); // betId='1' = 정규시간 승무패('118'=전반 승무패 등 제외)
   if (iHome < 0 || iWin < 0 || iLose < 0) return [];
 
   const now = new Date().toISOString();
@@ -216,6 +221,7 @@ export function parseBetmanGameSlip(raw: string): Odds[] {
   for (const row of cs.datas as unknown[][]) {
     if (iItem >= 0 && row[iItem] !== 'SC') continue; // 축구만
     if (iBet >= 0 && row[iBet] !== '승무패') continue; // 1X2 마켓만(핸디캡 등 제외)
+    if (iBetId >= 0 && String(row[iBetId]) !== '1') continue; // 정규시간만(전반 승무패 제외)
     if (iLeague >= 0 && !String(row[iLeague] ?? '').includes('월드컵')) continue;
 
     const home = str(row[iHome]);

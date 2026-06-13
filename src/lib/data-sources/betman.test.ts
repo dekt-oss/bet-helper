@@ -65,17 +65,18 @@ test('parseBetmanGameSlip: 축구 월드컵 승무패만 추출하고 승/무/�
   // 핸디캡(betTypNm '일반 정수핸디캡')과 타 종목(BS)은 제외돼야 한다.
   const sample = {
     compSchedules: {
-      keys: ['itemCode', 'leagueName', 'gameName', 'homeName', 'awayName', 'winAllot', 'drawAllot', 'loseAllot', 'betTypNm'],
+      keys: ['itemCode', 'leagueName', 'gameName', 'homeName', 'awayName', 'winAllot', 'drawAllot', 'loseAllot', 'betTypNm', 'betId'],
       datas: [
-        ['SC', '축구 월드컵', null, '아이티', '스코틀랜드', 5.4, 3.65, 1.53, '승무패'],
-        ['SC', '축구 월드컵', null, '브라질', '모로코', 1.62, 3.4, 5.0, '승무패'],
-        ['SC', '축구 월드컵', null, '아이티', '스코틀랜드', 2.31, 3.6, 2.35, '일반 정수핸디캡'],
-        ['BS', 'MLB', null, '볼티모어', '샌디에이고', 1.58, 0, 1.99, '일반 승패'],
+        ['SC', '축구 월드컵', null, '아이티', '스코틀랜드', 5.4, 3.65, 1.53, '승무패', '1'],
+        ['SC', '축구 월드컵', null, '브라질', '모로코', 1.62, 3.4, 5.0, '승무패', '1'],
+        ['SC', '축구 월드컵', null, '아이티', '스코틀랜드', 5.9, 2.1, 2.04, '승무패', '118'], // 전반 승무패 → 제외
+        ['SC', '축구 월드컵', null, '아이티', '스코틀랜드', 2.31, 3.6, 2.35, '일반 정수핸디캡', '5'],
+        ['BS', 'MLB', null, '볼티모어', '샌디에이고', 1.58, 0, 1.99, '일반 승패', '2'],
       ],
     },
   };
   const odds = parseBetmanGameSlip(JSON.stringify(sample));
-  // 승무패 축구만 → 2행(핸디캡·야구 제외).
+  // 정규시간 승무패 축구만 → 2행(전반 승무패·핸디캡·야구 제외).
   assert.equal(odds.length, 2);
   const m = odds.find((o) => o.externalRef === '아이티|스코틀랜드');
   assert.ok(m);
