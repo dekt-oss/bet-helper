@@ -25,12 +25,17 @@ function won(n: number) {
   return `${n.toLocaleString('ko-KR')}원`;
 }
 
-export default async function BetsPage() {
+export default async function BetsPage({
+  searchParams,
+}: {
+  searchParams?: { match?: string };
+}) {
   const [bets, { matches }, { odds }] = await Promise.all([
     listBets(),
     getMatches(),
     getOdds(),
   ]);
+  const initialMatchId = searchParams?.match;
   const stats = summarize(bets);
 
   // 폼에 넘길 경기 옵션(한국 우선 + 날짜 + 한글)
@@ -73,7 +78,11 @@ export default async function BetsPage() {
         </strong>
       </p>
 
-      <BetForm matches={matchOptions} oddsByMatch={oddsByMatch} />
+      <BetForm
+        matches={matchOptions}
+        oddsByMatch={oddsByMatch}
+        initialMatchId={initialMatchId}
+      />
 
       {bets.length === 0 ? (
         <p className="muted">아직 등록된 베팅이 없습니다. 위 폼으로 추가하세요.</p>

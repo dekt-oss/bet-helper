@@ -153,6 +153,12 @@ nav a:hover {
   background: var(--live);
   border-color: var(--live);
 }
+.badge.finished {
+  color: #fff;
+  background: #3b82f6;
+  border-color: #3b82f6;
+  font-weight: 600;
+}
 
 .muted {
   color: var(--muted);

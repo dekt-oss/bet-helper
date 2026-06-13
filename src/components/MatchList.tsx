@@ -103,7 +103,11 @@ function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
             <span className="muted">vs</span>
           )}
           <div>
-            <span className={`badge ${isLive ? 'live' : ''}`}>
+            <span
+              className={`badge ${isLive ? 'live' : ''} ${
+                m.status === 'FINISHED' ? 'finished' : ''
+              }`}
+            >
               {isLive && m.minute
                 ? `${m.minute}'`
                 : (statusText[m.status] ?? m.status)}

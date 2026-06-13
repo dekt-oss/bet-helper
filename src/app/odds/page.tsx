@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getMatches, getOdds } from '@/lib/data-sources';
 import { OddsForm } from '@/components/OddsForm';
 import { BetmanImport } from '@/components/BetmanImport';
@@ -13,6 +14,8 @@ export default async function OddsPage() {
     getOdds(),
   ]);
   const options = buildMatchOptions(matches);
+  // 베팅 등록 가능한(예정/진행중) 경기 id — 표에서 클릭 링크로 연결.
+  const bettableIds = new Set(options.map((o) => o.id));
   const matchName = new Map(
     matches.map((m) => [
       m.id,
@@ -73,7 +76,19 @@ export default async function OddsPage() {
             <tbody>
               {odds.map((o) => (
                 <tr key={o.matchId}>
-                  <td>{matchName.get(o.matchId) ?? o.externalRef ?? o.matchId}</td>
+                  <td>
+                    {bettableIds.has(o.matchId) ? (
+                      <Link
+                        href={`/bets?match=${encodeURIComponent(o.matchId)}`}
+                        style={{ color: 'var(--accent)' }}
+                        title="이 경기로 베팅 등록"
+                      >
+                        {matchName.get(o.matchId) ?? o.matchId} ↗
+                      </Link>
+                    ) : (
+                      (matchName.get(o.matchId) ?? o.externalRef ?? o.matchId)
+                    )}
+                  </td>
                   <td>{o.home.toFixed(2)}</td>
                   <td>{o.draw.toFixed(2)}</td>
                   <td>{o.away.toFixed(2)}</td>

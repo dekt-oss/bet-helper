@@ -28,13 +28,21 @@ function SubmitButton() {
 export function BetForm({
   matches,
   oddsByMatch,
+  initialMatchId,
 }: {
   matches: MatchOption[];
   oddsByMatch: Record<string, OddsTriple>;
+  /** 승부식 표에서 넘어올 때 미리 선택할 경기 id (?match=...) */
+  initialMatchId?: string;
 }) {
   const [state, formAction] = useFormState(createBetAction, initial);
   const formRef = useRef<HTMLFormElement>(null);
-  const [matchId, setMatchId] = useState('');
+  // 승부식에서 경기를 눌러 넘어온 경우 해당 경기를 미리 선택.
+  const [matchId, setMatchId] = useState(
+    initialMatchId && matches.some((m) => m.id === initialMatchId)
+      ? initialMatchId
+      : '',
+  );
   const [pick, setPick] = useState<Outcome | ''>('');
   const [odds, setOdds] = useState('');
   const [oddsTouched, setOddsTouched] = useState(false);
