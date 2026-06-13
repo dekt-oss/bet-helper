@@ -130,7 +130,12 @@ export async function getOdds(): Promise<OddsResult> {
       console.warn('[data] betman 스크래퍼 실패(무시):', err);
     }
   }
-  return { odds: [...map.values()], scraper, api };
+  // 현재 경기 목록에 없는 배당은 버린다.
+  // (옛 소스 시절 저장된 고아 스냅샷 — 예: football-data 의 'fd-...' id — 가
+  //  소스 교체 후 매칭이 끊겨 화면에 원본 id 로 노출되던 문제 방지)
+  const matchIds = new Set(matches.map((m) => m.id));
+  const odds = [...map.values()].filter((o) => matchIds.has(o.matchId));
+  return { odds, scraper, api };
 }
 
 // 한 번의 렌더에서 과거 배당 호출 수 상한(과금/지연 방지).

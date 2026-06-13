@@ -29,23 +29,43 @@ export function BetForm({
   matches,
   oddsByMatch,
   initialMatchId,
+  initialPick,
+  embedded,
+  onSuccess,
 }: {
   matches: MatchOption[];
   oddsByMatch: Record<string, OddsTriple>;
-  /** 승부식 표에서 넘어올 때 미리 선택할 경기 id (?match=...) */
+  /** 승부식에서 넘어올 때 미리 선택할 경기 id */
   initialMatchId?: string;
+  /** 승부식 배당 버튼에서 넘어올 때 미리 선택할 승/무/패 */
+  initialPick?: Outcome;
+  /** 승부식 인라인 패널 안에 임베드할 때(제목 숨김 등 컴팩트) */
+  embedded?: boolean;
+  /** 등록 성공 시 콜백(인라인 패널 닫기 등) */
+  onSuccess?: () => void;
 }) {
   const [state, formAction] = useFormState(createBetAction, initial);
   const formRef = useRef<HTMLFormElement>(null);
   // 승부식에서 경기를 눌러 넘어온 경우 해당 경기를 미리 선택.
-  const [matchId, setMatchId] = useState(
+  const presetMatchId =
     initialMatchId && matches.some((m) => m.id === initialMatchId)
       ? initialMatchId
-      : '',
-  );
-  const [pick, setPick] = useState<Outcome | ''>('');
-  const [odds, setOdds] = useState('');
+      : '';
+  const [matchId, setMatchId] = useState(presetMatchId);
+  const [pick, setPick] = useState<Outcome | ''>(initialPick ?? '');
+  const [odds, setOdds] = useState(() => {
+    const t = presetMatchId ? oddsByMatch[presetMatchId] : undefined;
+    if (t && initialPick) {
+      const v =
+        initialPick === 'HOME' ? t.home : initialPick === 'DRAW' ? t.draw : t.away;
+      return String(v);
+    }
+    return '';
+  });
   const [oddsTouched, setOddsTouched] = useState(false);
+  // onSuccess 는 매 렌더 새 함수일 수 있어 ref 로 최신값만 호출(effect 루프 방지).
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
 
   const hasMatches = matches.length > 0;
   const triple = oddsByMatch[matchId];
@@ -57,6 +77,7 @@ export function BetForm({
       setPick('');
       setOdds('');
       setOddsTouched(false);
+      onSuccessRef.current?.();
     }
   }, [state]);
 
@@ -83,8 +104,13 @@ export function BetForm({
   ];
 
   return (
-    <form action={formAction} ref={formRef} className="card" style={{ marginBottom: 24 }}>
-      <h2 style={{ marginTop: 0 }}>베팅 등록</h2>
+    <form
+      action={formAction}
+      ref={formRef}
+      className={embedded ? '' : 'card'}
+      style={{ marginBottom: embedded ? 0 : 24 }}
+    >
+      {!embedded && <h2 style={{ marginTop: 0 }}>베팅 등록</h2>}
 
       {!hasMatches && (
         <p className="error" style={{ marginTop: 0 }}>

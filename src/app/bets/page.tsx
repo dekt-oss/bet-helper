@@ -2,6 +2,7 @@ import { listBets, summarize } from '@/lib/bets/store';
 import { getMatches, getOdds } from '@/lib/data-sources';
 import { BetForm, type OddsTriple } from '@/components/BetForm';
 import { SettleBet } from '@/components/SettleBet';
+import { DeleteBet } from '@/components/DeleteBet';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { buildMatchOptions } from '@/lib/teams/options';
 import { toKoreanTeam } from '@/lib/teams/korea';
@@ -99,6 +100,7 @@ export default async function BetsPage({
                 <th>금액</th>
                 <th>상태 / 정산</th>
                 <th>수령</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -129,6 +131,9 @@ export default async function BetsPage({
                     )}
                   </td>
                   <td>{b.payout != null ? won(b.payout) : '-'}</td>
+                  <td>
+                    <DeleteBet id={b.id} />
+                  </td>
                 </tr>
               ))}
             </tbody>

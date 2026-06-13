@@ -40,6 +40,11 @@ export async function updateBet(
     : fileUpdateBet(id, patch);
 }
 
+/** 베팅 한 건을 삭제한다. 삭제됐으면 true, 없으면 false. */
+export async function deleteBet(id: string): Promise<boolean> {
+  return isSupabaseConfigured() ? sbDeleteBet(id) : fileDeleteBet(id);
+}
+
 /** 모임 자금 현황 요약: 총 베팅액 / 적중 수령액 / 손익. (순수 함수) */
 export function summarize(bets: Bet[]) {
   const totalStake = bets.reduce((s, b) => s + b.stake, 0);
@@ -135,6 +140,13 @@ async function sbUpdateBet(
   return data ? rowToBet(data as BetRow) : null;
 }
 
+async function sbDeleteBet(id: string): Promise<boolean> {
+  const sb = getSupabaseServer()!;
+  const { error } = await sb.from('bets').delete().eq('id', id);
+  if (error) throw new Error(`supabase deleteBet: ${error.message}`);
+  return true;
+}
+
 // ── 로컬 JSON 백엔드 (폴백) ──────────────────────────────
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -184,4 +196,13 @@ async function fileUpdateBet(
   bets[idx] = { ...bets[idx], ...patch, id };
   await writeAll(bets);
   return bets[idx];
+}
+
+async function fileDeleteBet(id: string): Promise<boolean> {
+  const bets = await readAll();
+  const idx = bets.findIndex((b) => b.id === id);
+  if (idx === -1) return false;
+  bets.splice(idx, 1);
+  await writeAll(bets);
+  return true;
 }

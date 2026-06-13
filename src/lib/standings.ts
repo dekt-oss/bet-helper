@@ -98,3 +98,96 @@ export function computeGroupStandings(matches: Match[]): GroupStandings[] {
   result.sort((a, b) => a.group.localeCompare(b.group));
   return result;
 }
+
+// ── 스테이지(조별리그 → 토너먼트) 섹션 정렬 ──────────────────
+
+interface StageMeta {
+  label: string;
+  order: number; // 진행 순서(조별리그=0 … 결승=5)
+}
+
+/** 토너먼트 스테이지 문자열 → 한글 라벨/순서. 조별리그면 null. */
+function knockoutMeta(stage?: string): StageMeta | null {
+  if (!stage) return null;
+  const s = stage.toLowerCase().replace(/[\s._-]/g, '');
+  // ‘final’ 이 부분문자열로 겹치므로 3·4위전/4강/8강을 먼저 검사한다.
+  if (/third|3rd|bronze/.test(s)) return { label: '3·4위전', order: 4.5 };
+  if (/semi|round4|4강/.test(s)) return { label: '4강', order: 4 };
+  if (/quarter|round8|8강/.test(s)) return { label: '8강', order: 3 };
+  if (/16/.test(s)) return { label: '16강', order: 2 };
+  if (/32/.test(s)) return { label: '32강', order: 1 };
+  if (/final|결승/.test(s)) return { label: '결승', order: 5 };
+  return null;
+}
+
+export type StageSection =
+  | {
+      kind: 'group';
+      title: string;
+      order: number;
+      active: boolean;
+      groups: GroupStandings[];
+    }
+  | {
+      kind: 'knockout';
+      title: string;
+      order: number;
+      active: boolean;
+      matches: Match[];
+    };
+
+/**
+ * 조별리그 순위 + 토너먼트 스테이지를 섹션으로 묶어, "현재 진행 스테이지"를
+ * 맨 위로 올려 반환한다. (조별리그 진행 중엔 조별리그가, 32강이 시작되면 32강이 위)
+ */
+export function computeStageSections(matches: Match[]): StageSection[] {
+  const sections: StageSection[] = [];
+
+  const groups = computeGroupStandings(matches);
+  if (groups.length > 0) {
+    sections.push({ kind: 'group', title: '조별리그', order: 0, active: false, groups });
+  }
+
+  const koMap = new Map<number, { label: string; matches: Match[] }>();
+  for (const m of matches) {
+    if (isGroupStage(m.stage)) continue;
+    const meta = knockoutMeta(m.stage);
+    if (!meta) continue;
+    const e = koMap.get(meta.order) ?? { label: meta.label, matches: [] };
+    e.matches.push(m);
+    koMap.set(meta.order, e);
+  }
+  for (const [order, e] of koMap) {
+    e.matches.sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+    sections.push({ kind: 'knockout', title: e.label, order, active: false, matches: e.matches });
+  }
+
+  if (sections.length === 0) return [];
+
+  // 각 섹션의 경기 상태(진행중/시작됨) 판정.
+  const groupMatches = matches.filter((m) => isGroupStage(m.stage));
+  const statusOf = (s: StageSection) => {
+    const ms = s.kind === 'group' ? groupMatches : s.matches;
+    return {
+      live: ms.some((m) => m.status === 'LIVE' || m.status === 'PAUSED'),
+      started: ms.some((m) => m.status !== 'SCHEDULED'),
+    };
+  };
+
+  // 활성 스테이지: 진행중 경기가 있는 스테이지 중 최상위 → 없으면 시작된 스테이지 중 최상위 → 아무것도 시작 전이면 가장 이른 스테이지.
+  let activeOrder: number;
+  const liveOrders = sections.filter((s) => statusOf(s).live).map((s) => s.order);
+  if (liveOrders.length > 0) {
+    activeOrder = Math.max(...liveOrders);
+  } else {
+    const startedOrders = sections.filter((s) => statusOf(s).started).map((s) => s.order);
+    activeOrder =
+      startedOrders.length > 0
+        ? Math.max(...startedOrders)
+        : Math.min(...sections.map((s) => s.order));
+  }
+
+  return sections
+    .map((s) => ({ ...s, active: s.order === activeOrder }))
+    .sort((a, b) => (a.active !== b.active ? (a.active ? -1 : 1) : a.order - b.order));
+}

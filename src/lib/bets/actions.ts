@@ -5,7 +5,7 @@
 // (기존 /api/bets route 는 curl/외부용으로 그대로 유지)
 
 import { revalidatePath } from 'next/cache';
-import { addBet, updateBet } from './store';
+import { addBet, updateBet, deleteBet } from './store';
 import type { Outcome } from '@/lib/types';
 
 export interface ActionState {
@@ -56,6 +56,26 @@ export async function createBetAction(
         '저장 실패: Supabase 테이블/키 설정을 확인하세요 (schema.sql 실행 여부).',
     };
   }
+  revalidatePath('/bets');
+  revalidatePath('/');
+  return { ok: true };
+}
+
+export async function deleteBetAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const id = String(formData.get('id') ?? '').trim();
+  if (!id) return { ok: false, error: '베팅 ID 가 없습니다.' };
+
+  try {
+    const deleted = await deleteBet(id);
+    if (!deleted) return { ok: false, error: '해당 베팅을 찾을 수 없습니다.' };
+  } catch (err) {
+    console.error('[action] deleteBet 실패:', err);
+    return { ok: false, error: '삭제 실패: Supabase 설정을 확인하세요.' };
+  }
+
   revalidatePath('/bets');
   revalidatePath('/');
   return { ok: true };

@@ -25,9 +25,11 @@ alter table public.bets enable row level security;
 drop policy if exists "public read"   on public.bets;
 drop policy if exists "public insert" on public.bets;
 drop policy if exists "public update" on public.bets;
+drop policy if exists "public delete" on public.bets;
 create policy "public read"   on public.bets for select using (true);
 create policy "public insert" on public.bets for insert with check (true);
 create policy "public update" on public.bets for update using (true);
+create policy "public delete" on public.bets for delete using (true);
 
 -- Realtime 활성화 (입력 즉시 모든 화면 반영)
 alter publication supabase_realtime add table public.bets;
