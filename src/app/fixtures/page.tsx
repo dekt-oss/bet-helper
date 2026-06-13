@@ -6,7 +6,9 @@ import { BetmanImport } from '@/components/BetmanImport';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { buildMatchOptions } from '@/lib/teams/options';
 import { listOpinions, groupByMatch } from '@/lib/opinions/store';
+import { listBetsSettled } from '@/lib/bets/store';
 import { MEMBERS, OPINION_MEMBERS, ADVISORY_MEMBERS } from '@/lib/pool/config';
+import type { Bet } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,12 +18,15 @@ export default async function FixturesPage() {
     getOdds(),
     listOpinions(),
   ]);
+  const bets = await listBetsSettled(matches);
 
   const oddsByMatch: Record<string, OddsTriple> = {};
   for (const o of odds)
     oddsByMatch[o.matchId] = { home: o.home, draw: o.draw, away: o.away };
 
   const opinionsByMatch = groupByMatch(opinions);
+  const betsByMatch: Record<string, Bet[]> = {};
+  for (const b of bets) (betsByMatch[b.matchId] ??= []).push(b);
   const betOptions = buildMatchOptions(matches);
 
   return (
@@ -47,6 +52,7 @@ export default async function FixturesPage() {
         matches={matches}
         oddsByMatch={oddsByMatch}
         opinionsByMatch={opinionsByMatch}
+        betsByMatch={betsByMatch}
         betOptions={betOptions}
         consensusMembers={MEMBERS}
         opinionMembers={OPINION_MEMBERS}

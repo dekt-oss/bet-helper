@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { Match, Outcome, Opinion } from '@/lib/types';
+import type { Match, Outcome, Opinion, Bet } from '@/lib/types';
 import { BetForm, type OddsTriple } from '@/components/BetForm';
 import { OpinionForm } from '@/components/OpinionForm';
 import { teamInfo } from '@/lib/teams/info-2026';
@@ -27,6 +27,18 @@ const statusText: Record<string, string> = {
   CANCELLED: '취소',
 };
 const pickLabel: Record<Outcome, string> = { HOME: '승', DRAW: '무', AWAY: '패' };
+const betStatusLabel: Record<string, string> = {
+  PENDING: '대기',
+  WON: '적중',
+  LOST: '미적중',
+  VOID: '무효',
+};
+
+function pickText(pick: Outcome, home: string, away: string): string {
+  if (pick === 'HOME') return `${home} 승`;
+  if (pick === 'AWAY') return `${away} 승`;
+  return '무승부';
+}
 
 function formatKickoff(iso: string): string {
   return new Intl.DateTimeFormat('ko-KR', {
@@ -63,6 +75,7 @@ export function MatchBoard({
   matches,
   oddsByMatch,
   opinionsByMatch,
+  betsByMatch,
   betOptions,
   consensusMembers,
   opinionMembers,
@@ -71,6 +84,7 @@ export function MatchBoard({
   matches: Match[];
   oddsByMatch: Record<string, OddsTriple>;
   opinionsByMatch: Record<string, Opinion[]>;
+  betsByMatch: Record<string, Bet[]>;
   betOptions: MatchOption[];
   consensusMembers: string[];
   opinionMembers: string[];
@@ -175,6 +189,7 @@ export function MatchBoard({
           const isOpen = openId === m.id;
           const opinions = opinionsByMatch[m.id] ?? [];
           const con = consensus(opinions, consensusMembers);
+          const myBets = betsByMatch[m.id] ?? [];
 
           const buttons: { key: Outcome; label: string; value: number }[] = t
             ? [
@@ -202,6 +217,9 @@ export function MatchBoard({
                     <span className="consensus-badge ok">
                       ✅ 합의 {pickLabel[con.pick!]}
                     </span>
+                  )}
+                  {myBets.length > 0 && (
+                    <span className="bet-badge">🎫 베팅 {myBets.length}건</span>
                   )}
                 </span>
                 <span className="odds-card-right">
@@ -309,6 +327,23 @@ export function MatchBoard({
                       </p>
                     )}
                   </div>
+
+                  {/* 내 베팅 이력 */}
+                  {myBets.length > 0 && (
+                    <div className="detail-block">
+                      <h4>베팅 이력 ({myBets.length}건)</h4>
+                      {myBets.map((b) => (
+                        <div key={b.id} className="bet-line">
+                          <span>{pickText(b.pick, home, away)}</span>
+                          <span className="muted">
+                            {b.stake.toLocaleString('ko-KR')}원 · 배당{' '}
+                            {b.oddsAtPlacement.toFixed(2)}
+                          </span>
+                          <span>{betStatusLabel[b.status] ?? b.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* 베팅 또는 결과 */}
                   <div className="detail-block">
