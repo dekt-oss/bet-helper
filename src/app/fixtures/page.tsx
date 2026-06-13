@@ -22,7 +22,13 @@ export default async function FixturesPage() {
 
   const oddsByMatch: Record<string, OddsTriple> = {};
   for (const o of odds)
-    oddsByMatch[o.matchId] = { home: o.home, draw: o.draw, away: o.away };
+    oddsByMatch[o.matchId] = {
+      home: o.home,
+      draw: o.draw,
+      away: o.away,
+      source: o.source,
+      updatedAt: o.updatedAt,
+    };
 
   const opinionsByMatch = groupByMatch(opinions);
   const betsByMatch: Record<string, Bet[]> = {};

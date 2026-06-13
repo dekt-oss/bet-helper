@@ -28,11 +28,15 @@ function toTeam(t: { name: string; code?: string }): Team {
   return { id: t.code ?? t.name, name: t.name, code: t.code };
 }
 
-function toKickoffIso(date: string, time?: string): string {
+function toKickoffIso(date: string, time?: string): string | null {
   // openfootball 시각은 보통 현지(개최지) 기준이라 정밀 보정이 필요하지만,
   // MVP 단계에서는 입력값을 그대로 ISO 로 조합한다. (추후 타임존 보정 TODO)
+  // 날짜가 비었거나(예: 미정 토너먼트 대진) 파싱 불가하면 null 을 반환해,
+  // 잘못된 fixture 하나가 toISOString RangeError 로 전체 목록을 깨뜨리지 않게 한다.
+  if (!date) return null;
   const t = time ?? '00:00';
-  return new Date(`${date}T${t}:00Z`).toISOString();
+  const d = new Date(`${date}T${t}:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 export async function fetchWorldCupFixtures(): Promise<Match[]> {
@@ -55,18 +59,23 @@ export async function fetchWorldCupFixtures(): Promise<Match[]> {
     for (const m of data.matches) flat.push({ m, round: m.round });
   }
 
-  return flat.map(({ m, round }) => {
+  const out: Match[] = [];
+  for (const { m, round } of flat) {
+    const kickoff = toKickoffIso(m.date, m.time);
+    // 킥오프 시각이 없는(미정) 경기는 건너뛴다 — 표시/베팅 대상이 아니다.
+    if (!kickoff) continue;
     const ft = m.score?.ft;
-    return {
+    out.push({
       id: `wc2026-${m.num ?? `${m.date}-${m.team1.name}-${m.team2.name}`}`,
       competition: data.name ?? 'FIFA World Cup 2026',
       stage: m.group ?? round,
-      kickoff: toKickoffIso(m.date, m.time),
+      kickoff,
       status: ft ? 'FINISHED' : 'SCHEDULED',
       home: toTeam(m.team1),
       away: toTeam(m.team2),
       score: ft ? { home: ft[0], away: ft[1] } : undefined,
       source: 'openfootball',
-    } satisfies Match;
-  });
+    } satisfies Match);
+  }
+  return out;
 }

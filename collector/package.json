@@ -1,0 +1,19 @@
+{
+  "name": "bet-helper-collector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "베트맨 승부식 배당을 본인(가정용 IP) PC에서 자동 수집해 bet-helper 앱으로 전송하는 헤드리스 에이전트. 이미 설치된 Chrome을 사용(별도 브라우저 다운로드 없음).",
+  "scripts": {
+    "setup": "node setup.js",
+    "login": "node collect.js --login-only --headful",
+    "capture": "node collect.js --capture-only --headful",
+    "once": "node collect.js --once",
+    "start": "node collect.js",
+    "send": "node send.js"
+  },
+  "dependencies": {
+    "dotenv": "16.4.5",
+    "playwright-core": "1.48.0"
+  }
+}

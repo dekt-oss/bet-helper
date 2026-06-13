@@ -27,6 +27,12 @@ yarn-error.log*
 /data/*.json
 !/data/.gitkeep
 
+# 수집기(collector) — 베트맨 자동 수집 에이전트의 비밀/세션/캡처는 절대 커밋 금지
+collector/node_modules/
+collector/.env
+collector/betman-session.json
+collector/captures/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

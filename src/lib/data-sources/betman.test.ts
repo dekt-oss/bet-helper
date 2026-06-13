@@ -61,26 +61,29 @@ test('matchOddsToMatches 는 한↔영 별칭으로 matchId 를 보정한다', a
 });
 
 test('parseBetmanGameSlip: 축구 월드컵 승무패만 추출하고 승/무/패 매핑', async () => {
+  // 실데이터 구조: 월드컵 여부는 leagueName('축구 월드컵'), gameName 은 null.
+  // 핸디캡(betTypNm '일반 정수핸디캡')과 타 종목(BS)은 제외돼야 한다.
   const sample = {
     compSchedules: {
-      keys: ['itemCode', 'gameName', 'homeName', 'awayName', 'winAllot', 'drawAllot', 'loseAllot', 'betTypNm'],
+      keys: ['itemCode', 'leagueName', 'gameName', 'homeName', 'awayName', 'winAllot', 'drawAllot', 'loseAllot', 'betTypNm', 'betId'],
       datas: [
-        ['SC', '축구 월드컵', '한국', '체코', 2.34, 3.0, 2.85, '승무패'],
-        ['SC', '축구 월드컵', '브라질', '모로코', 1.62, 3.4, 5.0, '승무패'],
-        ['BS', 'MLB', '볼티모어', '샌디에이고', 1.58, 0, 1.99, '일반 승패'],
-        ['SC', '축구 월드컵', '한국', '체코', 4.8, 3.7, 1.52, '승무패'],
+        ['SC', '축구 월드컵', null, '아이티', '스코틀랜드', 5.4, 3.65, 1.53, '승무패', '1'],
+        ['SC', '축구 월드컵', null, '브라질', '모로코', 1.62, 3.4, 5.0, '승무패', '1'],
+        ['SC', '축구 월드컵', null, '아이티', '스코틀랜드', 5.9, 2.1, 2.04, '승무패', '118'], // 전반 승무패 → 제외
+        ['SC', '축구 월드컵', null, '아이티', '스코틀랜드', 2.31, 3.6, 2.35, '일반 정수핸디캡', '5'],
+        ['BS', 'MLB', null, '볼티모어', '샌디에이고', 1.58, 0, 1.99, '일반 승패', '2'],
       ],
     },
   };
   const odds = parseBetmanGameSlip(JSON.stringify(sample));
-  // 야구 행 제외 → 축구 3행. 단 betman-한국-체코 가 2개라 같은 matchId.
-  const kor = odds.find((o) => o.externalRef === '한국|체코');
-  assert.ok(kor);
-  assert.equal(kor.home, 2.34);
-  assert.equal(kor.draw, 3.0);
-  assert.equal(kor.away, 2.85);
-  assert.equal(kor.source, 'betman');
-  assert.ok(odds.every((o) => o.source === 'betman'));
+  // 정규시간 승무패 축구만 → 2행(전반 승무패·핸디캡·야구 제외).
+  assert.equal(odds.length, 2);
+  const m = odds.find((o) => o.externalRef === '아이티|스코틀랜드');
+  assert.ok(m);
+  assert.equal(m.home, 5.4); // winAllot
+  assert.equal(m.draw, 3.65); // drawAllot
+  assert.equal(m.away, 1.53); // loseAllot
+  assert.equal(m.source, 'betman');
   assert.ok(!odds.some((o) => o.externalRef?.includes('볼티모어')));
 });
 

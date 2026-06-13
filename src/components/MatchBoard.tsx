@@ -51,6 +51,28 @@ function formatKickoff(iso: string): string {
   }).format(new Date(iso));
 }
 
+// 배당 출처 라벨. 베트맨이 실제 베팅 사이트라 강조한다.
+function oddsSourceLabel(source?: string): string {
+  if (source === 'betman') return '🟢 베트맨';
+  if (source === 'oddsapi') return '자동(Odds API)';
+  if (source === 'manual') return '수동 입력';
+  return '';
+}
+
+// 갱신 시각을 'M/D HH:MM' 로(KST).
+function formatOddsTime(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Seoul',
+  }).format(d);
+}
+
 function TeamDetail({ name }: { name: string }) {
   const info = teamInfo(name);
   return (
@@ -241,22 +263,46 @@ export function MatchBoard({
                 </span>
               </button>
 
-              {bettable && buttons.length > 0 && (
-                <div className="odds-pick-row">
-                  {buttons.map((p) => (
-                    <button
-                      key={p.key}
-                      type="button"
-                      className={`odds-pick-btn ${p.key.toLowerCase()} ${
-                        isOpen && betPick === p.key ? 'active' : ''
-                      }`}
-                      onClick={() => openCard(m.id, p.key)}
+              {buttons.length > 0 && (
+                <>
+                  <div className="odds-pick-row">
+                    {buttons.map((p) =>
+                      bettable ? (
+                        <button
+                          key={p.key}
+                          type="button"
+                          className={`odds-pick-btn ${p.key.toLowerCase()} ${
+                            isOpen && betPick === p.key ? 'active' : ''
+                          }`}
+                          onClick={() => openCard(m.id, p.key)}
+                        >
+                          <span className="k">{p.label}</span>
+                          <b>{p.value.toFixed(2)}</b>
+                        </button>
+                      ) : (
+                        // 종료/연기 경기는 클릭 불가, 마지막 배당만 표시(지나간 경기 배당 보존).
+                        <div
+                          key={p.key}
+                          className={`odds-pick-btn ${p.key.toLowerCase()}`}
+                          style={{ cursor: 'default', opacity: 0.7 }}
+                        >
+                          <span className="k">{p.label}</span>
+                          <b>{p.value.toFixed(2)}</b>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                  {t?.source && (
+                    <div
+                      className="muted"
+                      style={{ fontSize: 11, padding: '2px 10px 0', lineHeight: 1.5 }}
                     >
-                      <span className="k">{p.label}</span>
-                      <b>{p.value.toFixed(2)}</b>
-                    </button>
-                  ))}
-                </div>
+                      {oddsSourceLabel(t.source)} 배당
+                      {t.updatedAt ? ` · 갱신 ${formatOddsTime(t.updatedAt)}` : ''}
+                      {t.source === 'betman' ? ' · 약 15분마다 자동 갱신' : ''}
+                    </div>
+                  )}
+                </>
               )}
 
               {isOpen && (
