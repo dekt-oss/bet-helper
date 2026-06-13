@@ -31,6 +31,15 @@ export interface Match {
     home: number;
     away: number;
   };
+  /** 경기장 이름 (worldcup26.ir 등에서 제공) */
+  venue?: string;
+  /** 라운드/매치데이 라벨 (예: "1", "조별 2차전") */
+  matchday?: string;
+  /** 득점자 목록 (있으면) */
+  scorers?: {
+    home: string[];
+    away: string[];
+  };
   /** 데이터를 어디서 가져왔는지 추적용 */
   source: DataSourceId;
 }
@@ -53,6 +62,7 @@ export interface Odds {
 export type DataSourceId =
   | 'openfootball'
   | 'football-data'
+  | 'worldcup26'
   | 'api-football'
   | 'oddsapi'
   | 'betman'

@@ -5,6 +5,10 @@
 import type { Match, Odds } from '@/lib/types';
 import { fetchWorldCupFixtures } from './openfootball';
 import {
+  fetchWorldcup26Matches,
+  isWorldcup26Enabled,
+} from './worldcup26';
+import {
   fetchLiveWorldCupMatches,
   isFootballDataConfigured,
 } from './footballData';
@@ -29,6 +33,15 @@ export async function getMatches(): Promise<{
   matches: Match[];
   source: string;
 }> {
+  // 1순위: worldcup26.ir — 진행시간/득점자/경기장 등 상세 데이터 포함.
+  if (isWorldcup26Enabled()) {
+    try {
+      const matches = await fetchWorldcup26Matches();
+      if (matches.length > 0) return { matches, source: 'worldcup26' };
+    } catch (err) {
+      console.warn('[data] worldcup26 실패, 다른 소스로 폴백:', err);
+    }
+  }
   if (isFootballDataConfigured()) {
     try {
       const matches = await fetchLiveWorldCupMatches();

@@ -138,6 +138,18 @@ function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
               {isLive && m.minute ? ` · ${m.minute}'` : ''}
             </dd>
           </div>
+          {m.venue && (
+            <div>
+              <dt>경기장</dt>
+              <dd>{m.venue}</dd>
+            </div>
+          )}
+          {m.matchday && (
+            <div>
+              <dt>매치데이</dt>
+              <dd>{m.matchday}</dd>
+            </div>
+          )}
           {m.score && (
             <div>
               <dt>스코어</dt>
@@ -147,6 +159,26 @@ function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
               </dd>
             </div>
           )}
+          {m.scorers &&
+            (m.scorers.home.length > 0 || m.scorers.away.length > 0) && (
+              <div>
+                <dt>득점자</dt>
+                <dd>
+                  {m.scorers.home.length > 0 && (
+                    <div>
+                      <span className="muted">{toKoreanTeam(m.home.name)}</span>{' '}
+                      {m.scorers.home.join(', ')}
+                    </div>
+                  )}
+                  {m.scorers.away.length > 0 && (
+                    <div>
+                      <span className="muted">{toKoreanTeam(m.away.name)}</span>{' '}
+                      {m.scorers.away.join(', ')}
+                    </div>
+                  )}
+                </dd>
+              </div>
+            )}
           {odds && (
             <div>
               <dt>배당</dt>
