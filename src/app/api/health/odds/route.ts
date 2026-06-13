@@ -1,56 +1,28 @@
-// 배당 쓰기 실패 정밀 진단: URL 구성 + bets/odds 동일 쿼리 비교.
+// 배당 저장소 상태 점검(읽기 전용). 진단 테스트 찌꺼기(__healthcheck__)도 정리.
 // 예: /api/health/odds
 import { NextResponse } from 'next/server';
-import {
-  getSupabaseServer,
-  isSupabaseConfigured,
-  supabaseUrlDebug,
-} from '@/lib/db/supabase';
+import { listOdds } from '@/lib/odds/store';
+import { getSupabaseServer, isSupabaseConfigured } from '@/lib/db/supabase';
+import { isOddsApiConfigured } from '@/lib/data-sources/theOddsApi';
 
 export const dynamic = 'force-dynamic';
 
-type PgErr = { code?: string; message?: string };
-
-async function probe(table: string) {
-  const sb = getSupabaseServer();
-  if (!sb) return { ok: false, error: 'no client' };
-  const { error, count } = await sb
-    .from(table)
-    .select('*', { count: 'exact' })
-    .limit(1);
-  if (!error) return { ok: true, count };
-  const e = error as PgErr;
-  return { ok: false, code: e.code, message: e.message };
-}
-
-async function writeProbe() {
-  const sb = getSupabaseServer();
-  if (!sb) return { ok: false, error: 'no client' };
-  const { error } = await sb
-    .from('odds')
-    .upsert(
-      {
-        match_id: '__healthcheck__',
-        home: 1.5,
-        draw: 3,
-        away: 5,
-        source: 'oddsapi',
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'match_id' },
-    )
-    .select();
-  if (!error) return { ok: true };
-  const e = error as PgErr;
-  return { ok: false, code: e.code, message: e.message };
-}
-
 export async function GET() {
+  // 이전 진단에서 남은 헬스체크 행 정리(있으면).
+  try {
+    await getSupabaseServer()?.from('odds').delete().eq('match_id', '__healthcheck__');
+  } catch {
+    /* 무시 */
+  }
+
+  const odds = await listOdds().catch(() => []);
+  const bySource: Record<string, number> = {};
+  for (const o of odds) bySource[o.source] = (bySource[o.source] ?? 0) + 1;
+
   return NextResponse.json({
     persistent: isSupabaseConfigured(),
-    url: supabaseUrlDebug(), // raw 에 끝슬래시/경로가 있는지 확인
-    bets: await probe('bets'),
-    odds: await probe('odds'),
-    oddsWrite: await writeProbe(),
+    oddsApiConfigured: isOddsApiConfigured(),
+    storedTotal: odds.length,
+    bySource,
   });
 }
