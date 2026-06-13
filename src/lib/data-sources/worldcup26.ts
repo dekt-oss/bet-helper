@@ -10,9 +10,10 @@ import type { Match, Team } from '@/lib/types';
 
 const BASE = process.env.WORLDCUP26_BASE_URL ?? 'https://worldcup26.ir';
 // 공개 월드컵 데이터라 민감하지 않다. 환경변수로 덮어쓸 수 있게 둔다.
-const USERNAME = process.env.WORLDCUP26_USERNAME ?? 'bet-helper';
+// 로그인 키는 email + password, 등록 시 추가로 name 이 필요하다.
+const EMAIL = process.env.WORLDCUP26_EMAIL ?? 'bet-helper@worldcup.app';
 const PASSWORD = process.env.WORLDCUP26_PASSWORD ?? 'BetHelper!wc2026';
-const EMAIL = process.env.WORLDCUP26_EMAIL ?? 'bet-helper@example.com';
+const NAME = process.env.WORLDCUP26_USERNAME ?? 'bet-helper';
 
 /** worldcup26.ir 사용 여부. WORLDCUP26_DISABLED=true 로 끌 수 있다. */
 export function isWorldcup26Enabled(): boolean {
@@ -44,40 +45,49 @@ function pickToken(body: unknown): string | null {
   return null;
 }
 
-async function authenticate(): Promise<string | null> {
-  const res = await fetch(`${BASE}/auth/authenticate`, {
+async function rawPost(
+  path: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: { ...COMMON_HEADERS, 'content-type': 'application/json' },
-    body: JSON.stringify({ username: USERNAME, email: EMAIL, password: PASSWORD }),
+    body: JSON.stringify(body),
     cache: 'no-store',
+  });
+}
+
+async function authenticate(): Promise<string | null> {
+  const res = await rawPost('/auth/authenticate', {
+    email: EMAIL,
+    password: PASSWORD,
   });
   if (!res.ok) return null;
   return pickToken(await res.json().catch(() => null));
 }
 
-async function register(): Promise<void> {
-  // 계정이 없으면 자동 등록을 시도한다. 이미 있으면 에러가 나도 무시.
+async function register(): Promise<string | null> {
+  // 계정이 없으면 자동 등록을 시도한다. 성공 시 응답에 토큰이 포함된다.
   try {
-    await fetch(`${BASE}/auth/register`, {
-      method: 'POST',
-      headers: { ...COMMON_HEADERS, 'content-type': 'application/json' },
-      body: JSON.stringify({ username: USERNAME, email: EMAIL, password: PASSWORD }),
-      cache: 'no-store',
+    const res = await rawPost('/auth/register', {
+      name: NAME,
+      email: EMAIL,
+      password: PASSWORD,
     });
+    if (!res.ok) return null;
+    return pickToken(await res.json().catch(() => null));
   } catch (err) {
     console.warn('[worldcup26] 자동 등록 실패(무시):', err);
+    return null;
   }
 }
 
 async function getToken(): Promise<string | null> {
   if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value;
 
+  // 로그인 → 실패하면 계정 자동 등록(등록 응답에 토큰 포함).
   let token = await authenticate();
-  if (!token) {
-    // 로그인 실패 → 계정 자동 등록 후 재시도.
-    await register();
-    token = await authenticate();
-  }
+  if (!token) token = await register();
   if (!token) return null;
   cachedToken = { value: token, expiresAt: Date.now() + TOKEN_TTL_MS };
   return token;
@@ -224,10 +234,11 @@ async function fetchStadiums(): Promise<Map<string, string>> {
 
 export interface Wc26Diag {
   base: string;
-  username: string;
+  email: string;
   authStatus: number | null;
   authBodySnippet?: string;
   registerStatus: number | null;
+  registerBodySnippet?: string;
   tokenObtained: boolean;
   gamesStatus: number | null;
   gamesCount: number | null;
@@ -235,19 +246,10 @@ export interface Wc26Diag {
   error?: string;
 }
 
-async function rawPost(path: string): Promise<Response> {
-  return fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: { ...COMMON_HEADERS, 'content-type': 'application/json' },
-    body: JSON.stringify({ username: USERNAME, email: EMAIL, password: PASSWORD }),
-    cache: 'no-store',
-  });
-}
-
 export async function diagnoseWorldcup26(): Promise<Wc26Diag> {
   const diag: Wc26Diag = {
     base: BASE,
-    username: USERNAME,
+    email: EMAIL,
     authStatus: null,
     registerStatus: null,
     tokenObtained: false,
@@ -255,20 +257,26 @@ export async function diagnoseWorldcup26(): Promise<Wc26Diag> {
     gamesCount: null,
   };
   try {
-    let authRes = await rawPost('/auth/authenticate');
+    const authRes = await rawPost('/auth/authenticate', {
+      email: EMAIL,
+      password: PASSWORD,
+    });
     diag.authStatus = authRes.status;
-    let body = await authRes.clone().text();
+    let body = await authRes.text();
     let token = pickToken(safeJson(body));
+    diag.authBodySnippet = body.slice(0, 200);
 
     if (!token) {
-      const reg = await rawPost('/auth/register');
+      const reg = await rawPost('/auth/register', {
+        name: NAME,
+        email: EMAIL,
+        password: PASSWORD,
+      });
       diag.registerStatus = reg.status;
-      authRes = await rawPost('/auth/authenticate');
-      diag.authStatus = authRes.status;
-      body = await authRes.clone().text();
+      body = await reg.text();
+      diag.registerBodySnippet = body.slice(0, 200);
       token = pickToken(safeJson(body));
     }
-    diag.authBodySnippet = body.slice(0, 200);
     diag.tokenObtained = Boolean(token);
 
     if (token) {
