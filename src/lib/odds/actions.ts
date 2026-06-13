@@ -4,8 +4,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { upsertOdds } from './store';
-import { parseBetmanGameSlip, matchOddsToMatches } from '@/lib/data-sources/betman';
-import { getMatches } from '@/lib/data-sources';
+import { ingestBetmanRaw } from './ingest';
 
 export interface OddsActionState {
   ok: boolean;
@@ -66,25 +65,18 @@ export async function importBetmanAction(
   const raw = String(formData.get('json') ?? '').trim();
   if (!raw) return { ok: false, error: '베트맨 응답(JSON)을 붙여넣으세요.' };
 
-  const parsed = parseBetmanGameSlip(raw);
-  if (parsed.length === 0)
-    return {
-      ok: false,
-      error: '월드컵 승무패 배당을 찾지 못했습니다. gameSlip.do 응답이 맞는지 확인하세요.',
-    };
-
   try {
-    // 우리 경기와 팀명으로 매칭해 matchId 를 보정(매칭 실패해도 그대로 저장)
-    const { matches } = await getMatches();
-    const matched = matchOddsToMatches(parsed, matches);
-    for (const o of matched) {
-      await upsertOdds({ matchId: o.matchId, home: o.home, draw: o.draw, away: o.away });
-    }
+    const { count } = await ingestBetmanRaw(raw);
+    if (count === 0)
+      return {
+        ok: false,
+        error: '월드컵 승무패 배당을 찾지 못했습니다. gameSlip.do 응답이 맞는지 확인하세요.',
+      };
     revalidatePath('/odds');
     revalidatePath('/bets');
     revalidatePath('/fixtures');
     revalidatePath('/');
-    return { ok: true, count: matched.length };
+    return { ok: true, count };
   } catch (err) {
     console.error('[action] importBetman 실패:', err);
     return { ok: false, error: '저장 실패: Supabase odds 테이블을 확인하세요 (odds.sql 실행).' };
