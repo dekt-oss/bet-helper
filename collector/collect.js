@@ -201,7 +201,7 @@ function makeCollector(candidates) {
   };
 }
 
-/** JSON 파싱 가능 + 배당 신호가 가장 뚜렷한 후보를 고른다. */
+/** 앱 파서가 쓰는 compSchedules 포함 JSON 을 최우선으로 고른다. */
 function pickBest(candidates) {
   const scored = candidates
     .map((c) => {
@@ -211,10 +211,14 @@ function pickBest(candidates) {
       } catch {
         /* not json */
       }
+      const comp = c.body.includes('"compSchedules"') || c.body.includes('compSchedules') ? 1 : 0;
       const signal = (c.body.match(/winAllot|matchSeq|"allot"/g) || []).length;
-      return { ...c, json, signal };
+      return { ...c, json, comp, signal };
     })
-    .sort((a, b) => (b.json ? 1 : 0) - (a.json ? 1 : 0) || b.signal - a.signal);
+    .sort(
+      (a, b) =>
+        b.comp - a.comp || (b.json ? 1 : 0) - (a.json ? 1 : 0) || b.signal - a.signal,
+    );
   return scored[0] ?? null;
 }
 
@@ -315,6 +319,12 @@ async function runOnce(context) {
       warn('배당 JSON 을 캡처하지 못했습니다. (`npm run capture` 로 진단하거나 .env BETMAN_PROTO_URL 확인)');
       return;
     }
+    // 디버그용: 실제로 보낸 원본을 저장(파싱 0건일 때 node inspect.js last-sent.json 로 확인).
+    await fs.mkdir(cfg.capturesDir, { recursive: true }).catch(() => {});
+    await fs
+      .writeFile(path.join(cfg.capturesDir, 'last-sent.json'), best.body, 'utf-8')
+      .catch(() => {});
+    log(`전송 후보: ${best.url} (compSchedules ${best.comp ? '있음' : '없음'}, ${best.body.length}B)`);
     await postToIngest(best.body);
   } finally {
     await page.close().catch(() => {});
