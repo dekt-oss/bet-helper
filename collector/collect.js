@@ -269,11 +269,20 @@ async function dumpCandidates(candidates) {
 }
 
 async function postToIngest(raw) {
-  const res = await fetch(cfg.ingestUrl, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-ingest-token': cfg.ingestToken },
-    body: JSON.stringify({ raw }),
-  });
+  let res;
+  try {
+    res = await fetch(cfg.ingestUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ingest-token': cfg.ingestToken },
+      body: JSON.stringify({ raw }),
+    });
+  } catch (err) {
+    warn(
+      `ingest 연결 실패(fetch failed): ${err?.message ?? err}\n` +
+        `   → INGEST_URL 주소가 맞고 접속 가능한지 확인하세요(머지 후 프리뷰 주소는 사라짐): ${cfg.ingestUrl}`,
+    );
+    return;
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     warn(`ingest 실패 HTTP ${res.status}:`, body);
