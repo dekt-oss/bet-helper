@@ -49,7 +49,38 @@ export async function fetchWorldCupOdds(matches: Match[]): Promise<Odds[]> {
   if (remaining) console.info(`[the-odds-api] 남은 호출: ${remaining}`);
   if (!res.ok) throw new Error(`the-odds-api ${res.status}`);
   const events = (await res.json()) as OAEvent[];
+  return mapEventsToOdds(events, matches);
+}
 
+/**
+ * 과거(historical) 1X2 배당을 가져온다 — 이미 종료된 경기의 배당 백필용.
+ * - `isoDate`(보통 경기 킥오프 시각)에 가장 가까운 배당 스냅샷을 반환한다.
+ * - ⚠️ 과거 배당은 The Odds API 유료 플랜(Historical 권한)에서만 제공된다.
+ *   무료/미지원 키는 4xx 를 반환하므로 호출부에서 무시(폴백)하면 된다.
+ * - 과거 데이터는 불변이라 force-cache 로 동일 시각 중복 호출(=중복 과금)을 막는다.
+ */
+export async function fetchHistoricalWorldCupOdds(
+  matches: Match[],
+  isoDate: string,
+): Promise<Odds[]> {
+  const key = process.env.THE_ODDS_API_KEY;
+  if (!key) return [];
+
+  const url =
+    `https://api.the-odds-api.com/v4/historical/sports/${SPORT}/odds/` +
+    `?apiKey=${key}&regions=eu&markets=h2h&oddsFormat=decimal` +
+    `&date=${encodeURIComponent(isoDate)}`;
+  const res = await fetch(url, { cache: 'force-cache' });
+  const remaining = res.headers.get('x-requests-remaining');
+  if (remaining) console.info(`[the-odds-api/historical] 남은 호출: ${remaining}`);
+  if (!res.ok) throw new Error(`the-odds-api historical ${res.status}`);
+  // 과거 응답은 { timestamp, data: OAEvent[] } 형태로 감싸여 온다.
+  const body = (await res.json()) as { data?: OAEvent[] };
+  return mapEventsToOdds(body.data ?? [], matches);
+}
+
+/** OAEvent[] → 우리 Odds[] 로 매핑(라이브/과거 공통). */
+function mapEventsToOdds(events: OAEvent[], matches: Match[]): Odds[] {
   // 우리 경기를 팀쌍 키로 인덱싱
   const byPair = new Map<string, Match>();
   for (const m of matches) byPair.set(pairKey(m.home.name, m.away.name), m);

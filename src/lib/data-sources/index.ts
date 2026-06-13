@@ -13,7 +13,11 @@ import {
   isBetmanEnabled,
   matchOddsToMatches,
 } from './betman';
-import { fetchWorldCupOdds, isOddsApiConfigured } from './theOddsApi';
+import {
+  fetchWorldCupOdds,
+  fetchHistoricalWorldCupOdds,
+  isOddsApiConfigured,
+} from './theOddsApi';
 import { listOdds, upsertOdds } from '@/lib/odds/store';
 
 /**
@@ -91,6 +95,20 @@ export async function getOdds(): Promise<OddsResult> {
   // 종료되어 라이브 API 에서 빠진 경기는 마지막 스냅샷 배당으로 채운다.
   for (const [id, o] of snapshot) if (!map.has(id)) map.set(id, o);
 
+  // 이미 종료됐는데 라이브/스냅샷 모두 없는 경기는 과거(historical) 배당으로 1회 백필한다.
+  if (api) {
+    const missing = matches.filter(
+      (m) => m.status === 'FINISHED' && !map.has(m.id),
+    );
+    if (missing.length > 0) {
+      try {
+        await backfillHistoricalOdds(missing, matches, map);
+      } catch (err) {
+        console.warn('[data] 과거 배당 백필 실패(무시):', err);
+      }
+    }
+  }
+
   if (scraper) {
     try {
       const scraped = matchOddsToMatches(await fetchBetmanOdds(), matches);
@@ -100,6 +118,59 @@ export async function getOdds(): Promise<OddsResult> {
     }
   }
   return { odds: [...map.values()], scraper, api };
+}
+
+// 한 번의 렌더에서 과거 배당 호출 수 상한(과금/지연 방지).
+// (force-cache 라 동일 시각 재호출은 과금되지 않지만, 첫 백필 시 폭주를 막는다)
+const MAX_HISTORICAL_CALLS = 6;
+
+/**
+ * 이미 종료된 경기의 배당을 The Odds API 과거(historical) 스냅샷으로 채운다.
+ * - 같은 킥오프 시각끼리 묶어 호출 수를 최소화한다.
+ * - 가져온 배당은 결과 맵과 DB 스냅샷('oddsapi')에 모두 반영 → 다음 로드부턴 재호출 불필요.
+ * - 과거 권한이 없는 키(무료 플랜)는 4xx → 호출 실패로 조용히 폴백한다.
+ */
+async function backfillHistoricalOdds(
+  missing: Match[],
+  matches: Match[],
+  map: Map<string, Odds>,
+): Promise<void> {
+  const byTime = new Map<string, Match[]>();
+  for (const m of missing) {
+    const list = byTime.get(m.kickoff) ?? [];
+    list.push(m);
+    byTime.set(m.kickoff, list);
+  }
+
+  let calls = 0;
+  for (const [iso, group] of byTime) {
+    if (calls >= MAX_HISTORICAL_CALLS) break;
+    calls++;
+    let odds: Odds[];
+    try {
+      odds = await fetchHistoricalWorldCupOdds(matches, iso);
+    } catch (err) {
+      console.warn('[data] 과거 배당 조회 실패(무시):', err);
+      continue;
+    }
+    const byId = new Map(odds.map((o) => [o.matchId, o]));
+    for (const m of group) {
+      const o = byId.get(m.id);
+      if (!o) continue;
+      map.set(m.id, o);
+      try {
+        await upsertOdds({
+          matchId: o.matchId,
+          home: o.home,
+          draw: o.draw,
+          away: o.away,
+          source: 'oddsapi',
+        });
+      } catch (err) {
+        console.warn('[data] 과거 배당 스냅샷 저장 실패(무시):', err);
+      }
+    }
+  }
 }
 
 /**
