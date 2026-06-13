@@ -85,10 +85,19 @@ const extracted = datas.filter(
     okOdd(r[c.draw]) &&
     okOdd(r[c.lose]),
 );
+const cBetId = idx('betId');
+const cBetNm = idx('betNm');
+const cHandi = idx('handi');
+const cMseq = idx('matchSeq');
 console.log(`\n===== 파서가 추출할 월드컵 승무패 경기: ${extracted.length}개 =====`);
 for (const r of extracted) {
   const d = c.date >= 0 && r[c.date] ? new Date(r[c.date]).toISOString().slice(0, 16) : '';
   console.log(
-    `  ${r[c.home]} vs ${r[c.away]}  →  승 ${r[c.win]} / 무 ${r[c.draw]} / 패 ${r[c.lose]}  (${d})`,
+    `  ${r[c.home]} vs ${r[c.away]}  →  승 ${r[c.win]} / 무 ${r[c.draw]} / 패 ${r[c.lose]}` +
+      `  [betId=${r[cBetId]} betNm="${r[cBetNm]}" handi=${r[cHandi]} mSeq=${r[cMseq]}]  (${d})`,
   );
 }
+// 중복(한 경기 2줄) 구분을 위해 betNm 분포 출력
+const byBetNm = {};
+for (const r of extracted) byBetNm[r[cBetNm]] = (byBetNm[r[cBetNm]] ?? 0) + 1;
+console.log('\nbetNm 분포:', JSON.stringify(byBetNm));
