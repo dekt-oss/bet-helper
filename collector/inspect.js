@@ -1,4 +1,4 @@
-// 캡처 JSON 의 구조(skeleton)와 배당/경기 핵심 객체를 떠서 보여준다.
+// compSchedules.keys/datas 를 디코딩해 컬럼명·종목별 샘플 행을 보여준다.
 // 사용법:  node inspect.js slip-2.json
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -26,74 +26,46 @@ if (arg) {
 }
 
 console.log('파일:', file);
-const text = await fs.readFile(file, 'utf-8');
-let j;
-try {
-  j = JSON.parse(text);
-} catch {
-  console.log('JSON 아님. 앞부분:\n', text.slice(0, 600));
+const j = JSON.parse(await fs.readFile(file, 'utf-8'));
+const cs = j.compSchedules;
+if (!cs || !Array.isArray(cs.keys) || !Array.isArray(cs.datas)) {
+  console.log('compSchedules.keys/datas 가 없습니다.');
   process.exit(0);
 }
 
-// ── 1) 구조 skeleton (배열은 길이+첫 원소만, 문자열은 잘라서) ──
-function describe(node, depth, maxDepth) {
-  if (node === null) return 'null';
-  const t = typeof node;
-  if (t === 'string') return JSON.stringify(node.length > 36 ? node.slice(0, 36) + '…' : node);
-  if (t === 'number' || t === 'boolean') return String(node);
-  if (Array.isArray(node)) {
-    if (node.length === 0) return '[]';
-    if (depth >= maxDepth) return `[len ${node.length} …]`;
-    return `[len ${node.length}] ` + describe(node[0], depth + 1, maxDepth);
-  }
-  if (t === 'object') {
-    if (depth >= maxDepth) return '{…}';
-    const parts = Object.keys(node).map((k) => `${k}: ${describe(node[k], depth + 1, maxDepth)}`);
-    return '{ ' + parts.join(', ') + ' }';
-  }
-  return String(node);
+const keys = cs.keys;
+const datas = cs.datas;
+console.log('\n컬럼 수:', keys.length, '/ 행 수:', datas.length);
+console.log('\n===== 전체 컬럼명(keys) =====');
+console.log(JSON.stringify(keys));
+
+const idx = (k) => keys.indexOf(k);
+const decode = (r) => {
+  const o = {};
+  keys.forEach((k, i) => (o[k] = r[i]));
+  return o;
+};
+
+// itemCode(종목) 컬럼 추정: 정확히 'itemCode' 우선, 없으면 첫 컬럼.
+const itemCol = idx('itemCode') >= 0 ? idx('itemCode') : 0;
+const items = [...new Set(datas.map((r) => r[itemCol]))];
+console.log('\n===== 종목 코드 분포(컬럼', keys[itemCol], ') =====');
+for (const it of items) {
+  console.log(`  ${JSON.stringify(it)}: ${datas.filter((r) => r[itemCol] === it).length}행`);
 }
 
-console.log('\n===== 구조 skeleton (depth 6) =====');
-console.log(describe(j, 0, 6));
-
-// ── 2) 특정 키워드를 키로 가진 객체를 경로와 함께 찾아 전체 출력 ──
-function findObjectsWithKey(root, keyNames, max = 2) {
-  const out = [];
-  let visited = 0;
-  function walk(node, p, depth) {
-    if (out.length >= max || node === null || typeof node !== 'object' || depth > 16) return;
-    if (visited++ > 300000) return;
-    if (!Array.isArray(node)) {
-      const keys = Object.keys(node);
-      if (keyNames.some((kn) => keys.includes(kn))) {
-        out.push({ path: p || '(root)', obj: node });
-      }
-    }
-    const ents = Array.isArray(node)
-      ? node.slice(0, 40).map((v, i) => [`[${i}]`, v])
-      : Object.entries(node);
-    for (const [k, v] of ents) walk(v, p ? `${p}.${k}`.replace('.[', '[') : k, depth + 1);
-  }
-  walk(root, '', 0);
-  return out;
+// 종목별 첫 행을 디코딩해서 출력(구조 비교용)
+console.log('\n===== 종목별 샘플 1행(디코딩) =====');
+for (const it of items) {
+  const row = datas.find((r) => r[itemCol] === it);
+  console.log(`\n■ 종목 ${JSON.stringify(it)}`);
+  console.log(JSON.stringify(decode(row), null, 1));
 }
 
-console.log('\n===== 배당(winAllot) 또는 경기(homeName) 객체 샘플 =====');
-const found = findObjectsWithKey(j, ['winAllot', 'homeName', 'matchSeq'], 3);
-if (found.length === 0) {
-  console.log('winAllot/homeName/matchSeq 키를 가진 객체를 못 찾음.');
-} else {
-  for (const f of found) {
-    console.log(`\n■ 경로: ${f.path}`);
-    console.log(JSON.stringify(f.obj, null, 1).slice(0, 2500));
-  }
-}
-
-// ── 3) compSchedules / protoAllots 구조만 따로 ──
-for (const key of ['compSchedules', 'protoAllots']) {
-  if (j[key] !== undefined) {
-    console.log(`\n===== ${key} 구조 =====`);
-    console.log(describe(j[key], 0, 5));
-  }
-}
+// '월드컵' 글자가 어디든 들어간 행 최대 3개(축구 승무패 확인용)
+const wc = datas
+  .filter((r) => r.some((v) => typeof v === 'string' && v.includes('월드컵')))
+  .slice(0, 3);
+console.log('\n===== "월드컵" 포함 행 (최대 3개, 디코딩) =====');
+if (wc.length === 0) console.log('  (월드컵 글자 포함 행 없음 — 리그명이 다른 형태일 수 있음)');
+for (const r of wc) console.log('\n' + JSON.stringify(decode(r), null, 1));
