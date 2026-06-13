@@ -4,7 +4,7 @@ import './globals.css';
 import { RealtimeBets } from '@/components/RealtimeBets';
 
 export const metadata: Metadata = {
-  title: 'Bet Helper — 월드컵 공동 베팅 관리',
+  title: '구구뱃 — 월드컵 공동 베팅 관리',
   description:
     '월드컵 경기일정·실시간 현황·배당·우리 모임 베팅내역을 한곳에서 관리',
 };
@@ -20,7 +20,7 @@ export default function RootLayout({
         <header className="site">
           <div className="inner">
             <Link href="/" className="brand">
-              ⚽ Bet Helper
+              ⚽ 구구뱃
             </Link>
             <nav>
               <Link href="/">대시보드</Link>
