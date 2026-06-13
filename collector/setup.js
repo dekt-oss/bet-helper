@@ -30,8 +30,8 @@ console.log(`
 1) collector/.env 를 열어 값 4개만 채우기
      BETMAN_ID            베트맨 아이디
      BETMAN_PW            베트맨 비밀번호
-     INGEST_URL           https://<당신의-앱>.vercel.app/api/odds/ingest
-     ODDS_INGEST_TOKEN    Vercel 앱 env 에 넣은 값과 동일
+     INGEST_URL           앱 도메인 + /api/odds/ingest (풀 URL)
+     ODDS_INGEST_TOKEN    Vercel 에 넣은 그 값과 동일 (⚠️ odds api 키 아님, 전송 비밀번호)
 
 2) 최초 로그인 1회 (창이 뜸 — 캡차 있으면 직접 통과):
      npm run login
