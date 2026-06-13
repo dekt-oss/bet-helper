@@ -16,7 +16,7 @@
 // 셀렉터·URL 을 전부 env 로 빼두었다(코드 수정 없이 교체 가능).
 
 import 'dotenv/config';
-import { chromium } from 'playwright';
+import { chromium } from 'playwright-core';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -57,6 +57,8 @@ const cfg = {
   // 로그인 성공 마커(로그인 후에만 보이는 요소). 비어있으면 URL 변화로 판단.
   loggedInSel: process.env.BETMAN_LOGGEDIN_SELECTOR ?? 'a[href*="logout"], .logout, #logout',
 
+  // 설치된 브라우저 사용(별도 다운로드 없음). chrome → msedge 순으로 시도.
+  channel: process.env.BROWSER_CHANNEL ?? '',
   headless: HEADFUL ? false : (process.env.HEADLESS ?? 'true') !== 'false',
   intervalMin: Number(process.env.INTERVAL_MINUTES ?? '12'),
   jitterSec: Number(process.env.JITTER_SECONDS ?? '120'),
@@ -159,15 +161,22 @@ async function login(context, page) {
   log(`로그인 성공 → 세션 저장(${path.basename(cfg.sessionFile)}).`);
 }
 
-/** 승부식 페이지를 열어 gameSlip 응답(raw)을 네트워크 인터셉트로 캡처. */
+/**
+ * 승부식 페이지를 열어 배당 응답(raw)을 네트워크 인터셉트로 캡처.
+ * URL 패턴(.env)뿐 아니라 **응답 본문에 `compSchedules` 가 있으면 자동 인식** →
+ * 사용자가 정확한 XHR URL 을 몰라도 동작(설정 최소화).
+ */
 async function captureSlip(page) {
   let raw = null;
   const onResponse = async (res) => {
     if (raw) return;
-    if (!urlMatchesSlip(res.url())) return;
+    const type = res.request().resourceType();
+    if (type !== 'xhr' && type !== 'fetch' && type !== 'document') return;
     try {
+      const byUrl = urlMatchesSlip(res.url());
       const text = await res.text();
-      if (text && text.trim()) raw = text;
+      if (!text || !text.trim()) return;
+      if (byUrl || text.includes('compSchedules')) raw = text;
     } catch {
       /* 본문 못 읽으면 무시 */
     }
@@ -238,10 +247,32 @@ async function runCycle(context) {
   }
 }
 
+/**
+ * 설치된 Chrome(또는 Edge)을 사용해 브라우저를 띄운다.
+ * playwright-core 는 브라우저를 번들하지 않으므로 시스템 브라우저(channel)를 쓴다 → 가볍다.
+ */
+async function launchBrowser() {
+  const channels = cfg.channel ? [cfg.channel] : ['chrome', 'msedge'];
+  let lastErr;
+  for (const channel of channels) {
+    try {
+      const b = await chromium.launch({ headless: cfg.headless, channel });
+      log(`브라우저: ${channel}`);
+      return b;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw new Error(
+    'Chrome/Edge 를 찾지 못했습니다. 크롬을 설치하거나 .env 에 BROWSER_CHANNEL=msedge 등을 지정하세요. ' +
+      `(원인: ${lastErr?.message ?? lastErr})`,
+  );
+}
+
 async function main() {
   requireConfig();
 
-  const browser = await chromium.launch({ headless: cfg.headless });
+  const browser = await launchBrowser();
   const hasSession = await fileExists(cfg.sessionFile);
   const context = await browser.newContext({
     storageState: hasSession ? cfg.sessionFile : undefined,

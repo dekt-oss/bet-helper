@@ -16,21 +16,40 @@ collect.js  세션복원/자동로그인 → 승부식 페이지 gameSlip.do 응
 ```
 파싱·매칭·저장은 **앱이 전담**한다. 수집기는 raw 만 보낸다.
 
-## 설치
+## 빠른 시작 (복붙용)
+
+> 전제: PC 에 **Chrome 설치됨**(또는 Edge), **Node 18+ 설치됨**.
+> 별도 브라우저 다운로드 없음 — 설치된 Chrome 을 그대로 쓴다(가볍다).
+
 ```bash
 cd collector
-npm install            # playwright + Chromium 다운로드(앱 빌드와 분리됨)
-npx playwright install chromium   # (필요 시) 브라우저 바이너리 설치
-cp .env.example .env   # 값 채우기
+npm install        # 가벼움: playwright-core + dotenv 만 (Chromium 다운로드 안 함)
+npm run setup      # .env 생성 + 다음 단계 안내
 ```
 
-`.env` 필수값:
-- `BETMAN_ID`, `BETMAN_PW` — 베트맨 로그인(이 파일에만 둔다. Vercel/GitHub 에 넣지 않음)
+그다음 `collector/.env` 에서 **값 4개만** 채운다:
+- `BETMAN_ID`, `BETMAN_PW` — 베트맨 로그인 (이 파일에만 둔다. Vercel/GitHub 에 넣지 않음)
 - `INGEST_URL` — 예: `https://<앱>.vercel.app/api/odds/ingest`
-- `ODDS_INGEST_TOKEN` — **앱 env 의 `ODDS_INGEST_TOKEN` 과 같은 값**
+- `ODDS_INGEST_TOKEN` — **앱(Vercel) env 의 `ODDS_INGEST_TOKEN` 과 같은 값**
 
-> 앱 쪽 준비: Vercel 앱 env 에 `ODDS_INGEST_TOKEN`(랜덤 32+바이트) 설정 후 재배포.
-> 그리고 앱에 Supabase 가 설정돼 있어야 ingest 결과가 영속·실시간 반영된다(Vercel FS 는 임시).
+이어서:
+```bash
+npm run login      # 1) 최초 로그인 1회(창이 뜸, 캡차 있으면 직접 통과) → 세션 저장
+npm run capture    # 2) 실데이터 캡처 1회 → captures/ 의 json 으로 betman.ts 파서 보정
+npm start          # 3) 무인 자동 실행(12분±). 창 닫으면 멈춤
+```
+
+PC 부팅 시 자동 + 항상 켜두기(권장):
+```bash
+npm i -g pm2
+pm2 start ecosystem.config.cjs
+pm2 save
+# Windows 부팅 자동시작: `npm i -g pm2-windows-startup && pm2-startup install`
+# mac/Linux:            `pm2 startup` 출력 명령 1줄 실행
+```
+
+> 앱 쪽 준비(딱 1가지): Vercel 앱 env 에 `ODDS_INGEST_TOKEN`(랜덤 32+바이트) 설정 후 재배포.
+> 앱에 Supabase 가 설정돼 있어야 결과가 영속·실시간 반영된다(Vercel FS 는 임시).
 
 ## 처음 한 번: 로그인 시드 + 파서 보정
 
