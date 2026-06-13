@@ -1,4 +1,4 @@
-const FIELDS = ['ingestUrl', 'ingestToken', 'slipApiUrl', 'slipMethod', 'slipBody', 'periodMinutes'];
+const FIELDS = ['ingestUrl', 'ingestToken', 'periodMinutes'];
 
 async function load() {
   const c = await chrome.storage.sync.get();
@@ -10,7 +10,7 @@ async function load() {
 async function save() {
   const v = {};
   for (const k of FIELDS) v[k] = document.getElementById(k).value.trim();
-  v.periodMinutes = Math.max(10, parseInt(v.periodMinutes, 10) || 15);
+  v.periodMinutes = Math.max(60, parseInt(v.periodMinutes, 10) || 360);
 
   const msg = document.getElementById('msg');
 
@@ -32,7 +32,7 @@ async function save() {
   await chrome.storage.sync.set(v);
   chrome.runtime.sendMessage({ type: 'RESCHEDULE' });
   msg.style.color = '#16a34a';
-  msg.textContent = '저장됨 · ' + new Date().toLocaleTimeString();
+  msg.textContent = '저장됨 · 이제 베트맨 승부식 페이지를 한 번 열어주세요.';
 }
 
 document.getElementById('save').addEventListener('click', save);

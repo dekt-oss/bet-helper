@@ -1,15 +1,23 @@
 {
   "manifest_version": 3,
   "name": "Bet-Helper 베트맨 배당 수집기",
-  "version": "0.1.0",
-  "description": "본인 브라우저에서 베트맨 승부식 배당을 주기적으로 읽어 Bet-Helper 앱으로 보냅니다.",
+  "version": "0.2.0",
+  "description": "본인 브라우저에서 베트맨 승부식 배당을 자동 포착·주기 수집해 Bet-Helper 앱으로 보냅니다.",
   "permissions": ["alarms", "storage", "tabs", "scripting"],
   "host_permissions": ["https://*.betman.co.kr/*"],
   "optional_host_permissions": ["https://*/*", "http://*/*"],
   "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [
+    {
+      "matches": ["https://*.betman.co.kr/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["inject.js"], "matches": ["https://*.betman.co.kr/*"] }
+  ],
   "options_page": "options.html",
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "베트맨 배당 수집기"
-  }
+  "action": { "default_popup": "popup.html", "default_title": "베트맨 배당 수집기" }
 }
