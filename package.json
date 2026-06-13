@@ -9,8 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx ./src/**/*.test.ts",
-    "odds": "tsx scripts/fetch-odds.ts"
+    "test": "node --test --import tsx ./src/**/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.45.0",
