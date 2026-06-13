@@ -26,6 +26,8 @@ yarn-error.log*
 # 로컬 데이터 (배팅내역 JSON 등)
 /data/*.json
 !/data/.gitkeep
+# odds.json 은 Actions(collect-odds)가 자동 갱신·커밋하는 추적 대상이라 예외.
+!/data/odds.json
 
 # typescript
 *.tsbuildinfo
