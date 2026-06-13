@@ -141,6 +141,26 @@ interface WcStadium {
   id: string;
   name_en?: string;
   city_en?: string;
+  country_en?: string;
+}
+
+/** 진단용: 경기장 목록 + 우리가 계산한 시간대 오프셋. (시간 매핑 교정용) */
+export async function debugStadiums(): Promise<unknown> {
+  try {
+    const body = await apiGet<unknown>('/get/stadiums', 0);
+    const list: WcStadium[] = Array.isArray(body)
+      ? (body as WcStadium[])
+      : (((body as { stadiums?: WcStadium[] })?.stadiums ?? []) as WcStadium[]);
+    return list.map((s) => ({
+      id: s.id,
+      name: s.name_en,
+      city: s.city_en,
+      country: s.country_en,
+      offsetMin: stadiumOffsetMin(s.name_en, s.city_en),
+    }));
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 function num(s: string | undefined): number {
