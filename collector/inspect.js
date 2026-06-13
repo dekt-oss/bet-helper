@@ -1,6 +1,5 @@
-// 캡처 JSON 안에서 "배당(allot)이 든 경기 배열"의 위치와 샘플을 자동으로 찾아준다.
-// 사용법:  node inspect.js              (captures/ 의 최근 파일)
-//          node inspect.js slip-2.json  (특정 파일)
+// 캡처 JSON 의 구조(skeleton)와 배당/경기 핵심 객체를 떠서 보여준다.
+// 사용법:  node inspect.js slip-2.json
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -20,7 +19,7 @@ if (arg) {
   );
   entries.sort((a, b) => b.m - a.m);
   if (!entries.length) {
-    console.log('captures 폴더에 파일이 없습니다. 먼저 npm run capture 를 실행하세요.');
+    console.log('captures 폴더에 파일이 없습니다.');
     process.exit(0);
   }
   file = path.join(dir, entries[0].f);
@@ -28,61 +27,73 @@ if (arg) {
 
 console.log('파일:', file);
 const text = await fs.readFile(file, 'utf-8');
-console.log('길이:', text.length, 'bytes');
-
 let j;
 try {
   j = JSON.parse(text);
 } catch {
-  console.log('JSON 아님(HTML 등). 앞부분 800자:\n', text.slice(0, 800));
+  console.log('JSON 아님. 앞부분:\n', text.slice(0, 600));
   process.exit(0);
 }
 
-console.log('최상위 키:', Object.keys(j));
-
-// allot 류 키를 가진 객체인지
-function hasAllot(o) {
-  if (!o || typeof o !== 'object' || Array.isArray(o)) return false;
-  return Object.keys(o).some((k) => /allot/i.test(k));
+// ── 1) 구조 skeleton (배열은 길이+첫 원소만, 문자열은 잘라서) ──
+function describe(node, depth, maxDepth) {
+  if (node === null) return 'null';
+  const t = typeof node;
+  if (t === 'string') return JSON.stringify(node.length > 36 ? node.slice(0, 36) + '…' : node);
+  if (t === 'number' || t === 'boolean') return String(node);
+  if (Array.isArray(node)) {
+    if (node.length === 0) return '[]';
+    if (depth >= maxDepth) return `[len ${node.length} …]`;
+    return `[len ${node.length}] ` + describe(node[0], depth + 1, maxDepth);
+  }
+  if (t === 'object') {
+    if (depth >= maxDepth) return '{…}';
+    const parts = Object.keys(node).map((k) => `${k}: ${describe(node[k], depth + 1, maxDepth)}`);
+    return '{ ' + parts.join(', ') + ' }';
+  }
+  return String(node);
 }
 
-// 재귀적으로 "allot 객체들의 배열" 을 찾는다.
-const hits = [];
-let visited = 0;
-function walk(node, p, depth) {
-  if (node === null || typeof node !== 'object' || depth > 14 || visited > 200000) return;
-  visited++;
-  if (Array.isArray(node)) {
-    if (node.length && node.some((el) => hasAllot(el))) {
-      hits.push({ path: p || '(root)', len: node.length, sample: node.find((el) => hasAllot(el)) });
+console.log('\n===== 구조 skeleton (depth 6) =====');
+console.log(describe(j, 0, 6));
+
+// ── 2) 특정 키워드를 키로 가진 객체를 경로와 함께 찾아 전체 출력 ──
+function findObjectsWithKey(root, keyNames, max = 2) {
+  const out = [];
+  let visited = 0;
+  function walk(node, p, depth) {
+    if (out.length >= max || node === null || typeof node !== 'object' || depth > 16) return;
+    if (visited++ > 300000) return;
+    if (!Array.isArray(node)) {
+      const keys = Object.keys(node);
+      if (keyNames.some((kn) => keys.includes(kn))) {
+        out.push({ path: p || '(root)', obj: node });
+      }
     }
-    for (let i = 0; i < Math.min(node.length, 30); i++) walk(node[i], `${p}[${i}]`, depth + 1);
-  } else {
-    for (const k of Object.keys(node)) walk(node[k], p ? `${p}.${k}` : k, depth + 1);
+    const ents = Array.isArray(node)
+      ? node.slice(0, 40).map((v, i) => [`[${i}]`, v])
+      : Object.entries(node);
+    for (const [k, v] of ents) walk(v, p ? `${p}.${k}`.replace('.[', '[') : k, depth + 1);
+  }
+  walk(root, '', 0);
+  return out;
+}
+
+console.log('\n===== 배당(winAllot) 또는 경기(homeName) 객체 샘플 =====');
+const found = findObjectsWithKey(j, ['winAllot', 'homeName', 'matchSeq'], 3);
+if (found.length === 0) {
+  console.log('winAllot/homeName/matchSeq 키를 가진 객체를 못 찾음.');
+} else {
+  for (const f of found) {
+    console.log(`\n■ 경로: ${f.path}`);
+    console.log(JSON.stringify(f.obj, null, 1).slice(0, 2500));
   }
 }
-walk(j, '', 0);
 
-// 중복 경로 정리(같은 배열을 여러 번 못 잡게 path 기준 유니크)
-const uniq = [];
-const seen = new Set();
-for (const h of hits) {
-  const key = h.path.replace(/\[\d+\]/g, '[]');
-  if (seen.has(key)) continue;
-  seen.add(key);
-  uniq.push(h);
-}
-
-if (uniq.length === 0) {
-  console.log('\nallot 키를 가진 배열을 못 찾음. allot 포함 키 일부를 출력:');
-  const m = text.match(/"\w*[Aa]llot\w*"\s*:/g) || [];
-  console.log([...new Set(m)].slice(0, 30));
-  process.exit(0);
-}
-
-console.log(`\n배당 배열 후보 ${uniq.length}개 발견:`);
-for (const h of uniq) {
-  console.log(`\n■ 경로: ${h.path.replace(/\[\d+\]/g, '[]')}   (배열 길이 ${h.len})`);
-  console.log('  샘플 한 경기(전체 필드):');
-  console.log(JSON.stringify(h.sample, null, 1));
+// ── 3) compSchedules / protoAllots 구조만 따로 ──
+for (const key of ['compSchedules', 'protoAllots']) {
+  if (j[key] !== undefined) {
+    console.log(`\n===== ${key} 구조 =====`);
+    console.log(describe(j[key], 0, 5));
+  }
 }
