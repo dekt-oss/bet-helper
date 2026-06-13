@@ -163,70 +163,108 @@ async function ensureSession(context, page) {
 }
 
 // ── 배당 캡처 ─────────────────────────────────────────────
+// gameSlip.do 는 HTML 화면만 주고, 실제 배당 데이터는 페이지 JS 가 별도 XHR(JSON)로 받아온다.
+// 그래서 "HTML 껍데기는 버리고 배당 신호(winAllot 등)가 든 JSON 응답만" 골라 수집한다.
 
-function makeSlipListener(state) {
+function isHtmlBody(t) {
+  const s = t.trimStart().slice(0, 200).toLowerCase();
+  return s.startsWith('<') || s.includes('<!doctype') || s.includes('<html');
+}
+function looksLikeOdds(t) {
+  return (
+    t.includes('winAllot') ||
+    t.includes('matchSeq') ||
+    t.includes('compSchedules') ||
+    t.includes('"allot"')
+  );
+}
+
+/** 배당이 든 JSON 응답 후보들을 모은다(중복 URL 은 마지막 것으로 갱신). */
+function makeCollector(candidates) {
   return async (res) => {
-    if (state.raw) return;
     const type = res.request().resourceType();
-    if (type !== 'xhr' && type !== 'fetch' && type !== 'document') return;
+    if (type !== 'xhr' && type !== 'fetch') return;
+    let text;
     try {
-      const text = await res.text();
-      if (!text || !text.trim()) return;
-      const byUrl = cfg.slipUrlMatch.some((m) => res.url().includes(m));
-      if (byUrl || text.includes('compSchedules')) {
-        state.raw = text;
-        state.url = res.url();
-      }
+      text = await res.text();
     } catch {
-      /* 본문 못 읽으면 무시 */
+      return;
     }
+    if (!text || !text.trim() || isHtmlBody(text)) return;
+    const byUrl = cfg.slipUrlMatch.some((m) => res.url().includes(m));
+    if (!byUrl && !looksLikeOdds(text)) return;
+    const url = res.url();
+    const i = candidates.findIndex((c) => c.url === url);
+    if (i >= 0) candidates[i] = { url, body: text };
+    else candidates.push({ url, body: text });
   };
 }
 
-/** 자동: 승부식 페이지로 이동해 배당 응답을 캡처. */
-async function captureAuto(page) {
-  const state = { raw: null, url: null };
-  const listener = makeSlipListener(state);
-  page.on('response', listener);
-  try {
-    await page.goto(cfg.protoUrl, { waitUntil: 'networkidle', timeout: cfg.navTimeout }).catch(
-      () => {},
-    );
-    for (let i = 0; i < 12 && !state.raw; i++) await sleep(800);
-  } finally {
-    page.off('response', listener);
-  }
-  return state;
+/** JSON 파싱 가능 + 배당 신호가 가장 뚜렷한 후보를 고른다. */
+function pickBest(candidates) {
+  const scored = candidates
+    .map((c) => {
+      let json = null;
+      try {
+        json = JSON.parse(c.body);
+      } catch {
+        /* not json */
+      }
+      const signal = (c.body.match(/winAllot|matchSeq|"allot"/g) || []).length;
+      return { ...c, json, signal };
+    })
+    .sort((a, b) => (b.json ? 1 : 0) - (a.json ? 1 : 0) || b.signal - a.signal);
+  return scored[0] ?? null;
 }
 
-/** 캡처 모드: 자동 시도 후 실패하면 사용자가 직접 승부식 페이지로 이동 → Enter. */
-async function captureManual(page) {
-  const state = { raw: null, url: null };
-  const listener = makeSlipListener(state);
+/** 페이지를 띄워(필요시 사용자 직접 이동) 배당 JSON 후보들을 수집. */
+async function collectCandidates(page, { manual }) {
+  const candidates = [];
+  const listener = makeCollector(candidates);
   page.on('response', listener);
   try {
-    await page.goto(cfg.protoUrl, { waitUntil: 'networkidle', timeout: cfg.navTimeout }).catch(
-      () => {},
-    );
-    for (let i = 0; i < 8 && !state.raw; i++) await sleep(800);
-    if (!state.raw) {
-      log('▶ 자동으로 못 잡았습니다. 크롬 창에서 [프로토 승부식] 월드컵 경기 배당이 보이는 화면으로 이동하세요.');
+    await page
+      .goto(manual ? cfg.homeUrl : cfg.protoUrl, {
+        waitUntil: 'networkidle',
+        timeout: cfg.navTimeout,
+      })
+      .catch(() => {});
+    for (let i = 0; i < 10 && candidates.length === 0; i++) await sleep(800);
+    if (manual) {
+      log('▶ 크롬 창에서 [프로토 승부식 → 축구 → 월드컵] 경기의 배당(승/무/패 숫자)이 보이는 화면으로 이동하세요.');
+      log('   (경기를 클릭해 배당이 화면에 뜨게 하면 됩니다.)');
       await waitForEnter('   배당이 화면에 보이면 이 창에서 Enter… ');
-      await sleep(800);
+      await sleep(1000);
     }
   } finally {
     page.off('response', listener);
   }
-  return state;
+  return candidates;
 }
 
-async function dumpCapture(state) {
+/** 캡처 진단: 후보 JSON 들을 파일로 저장하고 요약을 출력. */
+async function dumpCandidates(candidates) {
+  if (candidates.length === 0) {
+    warn('배당 JSON 응답을 하나도 못 잡았습니다. 크롬 창에서 실제 배당이 보이는 화면까지 이동했는지 확인하세요.');
+    return;
+  }
   await fs.mkdir(cfg.capturesDir, { recursive: true });
-  const file = path.join(cfg.capturesDir, `gameSlip-${Date.now()}.json`);
-  await fs.writeFile(file, state.raw, 'utf-8');
-  log(`캡처 저장: ${path.relative(HERE, file)} (${state.raw.length} bytes)`);
-  if (state.url) log(`캡처된 응답 URL: ${state.url}`);
-  log('→ 이 파일 내용을 개발자에게 전달하면 앱 파서(betman.ts)를 실데이터에 맞춰 보정합니다.');
+  log(`배당 후보 ${candidates.length}개 수집:`);
+  let n = 0;
+  for (const c of candidates) {
+    const file = path.join(cfg.capturesDir, `slip-${++n}.json`);
+    await fs.writeFile(file, c.body, 'utf-8');
+    let parsed = '비-JSON';
+    try {
+      JSON.parse(c.body);
+      parsed = 'JSON';
+    } catch {
+      /* */
+    }
+    log(`  [${n}] ${parsed} ${c.body.length}B  ${c.url}`);
+    log(`      앞부분: ${c.body.slice(0, 300).replace(/\s+/g, ' ')}`);
+  }
+  log(`→ captures\\slip-*.json 저장됨. 'node inspect.js slip-1.json' 처럼 확인하거나 개발자에게 전달하세요.`);
 }
 
 async function postToIngest(raw) {
@@ -257,17 +295,17 @@ async function runOnce(context) {
       return;
     }
 
-    const state = CAPTURE_ONLY ? await captureManual(page) : await captureAuto(page);
-    if (!state.raw) {
-      warn('배당 응답을 캡처하지 못했습니다. 승부식 URL(.env BETMAN_PROTO_URL)을 확인하거나 `npm run capture` 로 직접 시도하세요.');
-      return;
-    }
+    const candidates = await collectCandidates(page, { manual: CAPTURE_ONLY });
     if (CAPTURE_ONLY) {
-      await dumpCapture(state);
+      await dumpCandidates(candidates);
       return;
     }
-    await dumpCapture(state).catch(() => {});
-    await postToIngest(state.raw);
+    const best = pickBest(candidates);
+    if (!best) {
+      warn('배당 JSON 을 캡처하지 못했습니다. (`npm run capture` 로 진단하거나 .env BETMAN_PROTO_URL 확인)');
+      return;
+    }
+    await postToIngest(best.body);
   } finally {
     await page.close().catch(() => {});
   }
