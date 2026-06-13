@@ -3,7 +3,7 @@
 // 경기별 멤버 의견 입력/수정 Server Action.
 
 import { revalidatePath } from 'next/cache';
-import { upsertOpinion } from './store';
+import { upsertOpinion, deleteOpinion } from './store';
 import type { Outcome } from '@/lib/types';
 
 export interface OpinionState {
@@ -35,6 +35,19 @@ export async function upsertOpinionAction(
       error: '저장 실패: Supabase opinions 테이블을 확인하세요 (opinions.sql 실행).',
     };
   }
-  revalidatePath('/odds');
+  revalidatePath('/fixtures');
   return { ok: true };
+}
+
+/** 폼 버튼에서 바로 쓰는 삭제 액션(FormData 전용). */
+export async function deleteOpinionSimple(formData: FormData): Promise<void> {
+  const matchId = String(formData.get('matchId') ?? '').trim();
+  const member = String(formData.get('member') ?? '').trim();
+  if (!matchId || !member) return;
+  try {
+    await deleteOpinion(matchId, member);
+  } catch (err) {
+    console.error('[action] deleteOpinion 실패:', err);
+  }
+  revalidatePath('/fixtures');
 }

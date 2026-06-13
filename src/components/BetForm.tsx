@@ -230,11 +230,6 @@ export function BetForm({
           />
         </div>
 
-        <div>
-          <label htmlFor="note">메모 (선택)</label>
-          <input id="note" name="note" type="text" placeholder="비고" />
-        </div>
-
         {expected != null && (
           <div className="full payout-preview">
             예상 수령액 <b>{expected.toLocaleString('ko-KR')}원</b>

@@ -451,6 +451,12 @@ button.danger:hover {
   color: var(--text);
   white-space: nowrap;
 }
+.odds-card-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
 .odds-card.kr {
   border-left: 3px solid #ef4444;
 }
@@ -610,6 +616,30 @@ button.danger:hover {
   color: #f59e0b;
 }
 
+/* 의견 요약(읽기전용) + 펼치기 토글 */
+.opinion-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.opinion-chip b {
+  color: var(--accent);
+}
+.opinion-toggle {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+}
+.opinion-edit-list {
+  margin-top: 8px;
+}
+
 /* 의견 입력 행 */
 .opinion-row {
   display: flex;
@@ -617,6 +647,22 @@ button.danger:hover {
   gap: 8px;
   flex-wrap: wrap;
   padding: 6px 0;
+}
+.opinion-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.opinion-del {
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
 }
 .opinion-member {
   min-width: 56px;

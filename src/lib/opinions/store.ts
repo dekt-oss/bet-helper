@@ -30,6 +30,15 @@ export async function upsertOpinion(input: OpinionInput): Promise<Opinion> {
   return isSupabaseConfigured() ? sbUpsert(input) : fileUpsert(input);
 }
 
+export async function deleteOpinion(
+  matchId: string,
+  member: string,
+): Promise<boolean> {
+  return isSupabaseConfigured()
+    ? sbDelete(matchId, member)
+    : fileDelete(matchId, member);
+}
+
 /** matchId → (member → Opinion) 로 묶어 반환(화면 표시용). */
 export function groupByMatch(list: Opinion[]): Record<string, Opinion[]> {
   const m: Record<string, Opinion[]> = {};
@@ -85,6 +94,17 @@ async function sbUpsert(input: OpinionInput): Promise<Opinion> {
   return rowToOpinion(data as Row);
 }
 
+async function sbDelete(matchId: string, member: string): Promise<boolean> {
+  const sb = getSupabaseServer()!;
+  const { error } = await sb
+    .from('opinions')
+    .delete()
+    .eq('match_id', matchId)
+    .eq('member', member);
+  if (error) throw new Error(`supabase deleteOpinion: ${error.message}`);
+  return true;
+}
+
 // ── 로컬 JSON 폴백 ────────────────────────────────────────
 const DATA_DIR = path.join(process.cwd(), 'data');
 const FILE = path.join(DATA_DIR, 'opinions.json');
@@ -119,4 +139,16 @@ async function fileUpsert(input: OpinionInput): Promise<Opinion> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(FILE, JSON.stringify(all, null, 2), 'utf-8');
   return o;
+}
+
+async function fileDelete(matchId: string, member: string): Promise<boolean> {
+  const all = await readAll();
+  const idx = all.findIndex(
+    (x) => x.matchId === matchId && x.member === member,
+  );
+  if (idx === -1) return false;
+  all.splice(idx, 1);
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(FILE, JSON.stringify(all, null, 2), 'utf-8');
+  return true;
 }

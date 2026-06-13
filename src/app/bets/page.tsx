@@ -1,7 +1,6 @@
 import { listBetsSettled, summarize } from '@/lib/bets/store';
 import { getMatches, getOdds } from '@/lib/data-sources';
 import { BetForm, type OddsTriple } from '@/components/BetForm';
-import { SettleBet } from '@/components/SettleBet';
 import { DeleteBet } from '@/components/DeleteBet';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { buildMatchOptions } from '@/lib/teams/options';
@@ -107,7 +106,7 @@ export default async function BetsPage({
                 <th>선택</th>
                 <th>배당</th>
                 <th>금액</th>
-                <th>상태 / 정산</th>
+                <th>상태</th>
                 <th>수령</th>
                 <th></th>
               </tr>
@@ -122,17 +121,7 @@ export default async function BetsPage({
                   <td>{pickLabel[b.pick] ?? b.pick}</td>
                   <td>{b.oddsAtPlacement.toFixed(2)}</td>
                   <td>{won(b.stake)}</td>
-                  <td>
-                    {b.status === 'PENDING' ? (
-                      <SettleBet
-                        id={b.id}
-                        stake={b.stake}
-                        oddsAtPlacement={b.oddsAtPlacement}
-                      />
-                    ) : (
-                      (statusLabel[b.status] ?? b.status)
-                    )}
-                  </td>
+                  <td>{statusLabel[b.status] ?? b.status}</td>
                   <td>{b.payout != null ? won(b.payout) : '-'}</td>
                   <td>
                     <DeleteBet id={b.id} />
