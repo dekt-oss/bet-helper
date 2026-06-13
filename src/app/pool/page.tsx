@@ -1,8 +1,6 @@
-import { listBets } from '@/lib/bets/store';
-import {
-  computePoolBalance,
-  computeMemberShares,
-} from '@/lib/pool/balance';
+import { listBetsSettled } from '@/lib/bets/store';
+import { getMatches } from '@/lib/data-sources';
+import { computePoolBalance, computePerPerson } from '@/lib/pool/balance';
 import { POOL } from '@/lib/pool/config';
 import { AutoRefresh } from '@/components/AutoRefresh';
 
@@ -17,9 +15,10 @@ function signed(n: number) {
 }
 
 export default async function PoolPage() {
-  const bets = await listBets();
+  const { matches } = await getMatches();
+  const bets = await listBetsSettled(matches);
   const pool = computePoolBalance(bets);
-  const shares = computeMemberShares(pool.profit);
+  const per = computePerPerson(pool);
   const profitColor = pool.profit >= 0 ? 'var(--accent)' : 'var(--live)';
 
   return (
@@ -87,46 +86,25 @@ export default async function PoolPage() {
         </div>
       </div>
 
-      {/* 멤버별 지분 */}
-      <h2 style={{ marginTop: 32 }}>멤버별 정산</h2>
+      {/* 개인당(균등 분배) */}
+      <h2 style={{ marginTop: 32 }}>개인당 ({per.count}명 균등)</h2>
       <p className="muted" style={{ fontSize: 13 }}>
-        손익을 출자 비율대로 나눈 현재 지분 가치입니다.
+        손익·잔액을 인원수로 똑같이 나눈 1인 기준 금액입니다.
       </p>
-      <div className="card table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>멤버</th>
-              <th>출자액</th>
-              <th>손익 몫</th>
-              <th>현재 지분</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shares.map((s) => (
-              <tr key={s.id}>
-                <td>{s.name}</td>
-                <td>{won(s.contribution)}</td>
-                <td style={{ color: s.profitShare >= 0 ? 'var(--accent)' : 'var(--live)' }}>
-                  {signed(s.profitShare)}
-                </td>
-                <td>
-                  <strong>{won(s.equity)}</strong>
-                </td>
-              </tr>
-            ))}
-            <tr>
-              <td className="muted">합계</td>
-              <td className="muted">{won(pool.initial)}</td>
-              <td className="muted" style={{ color: profitColor }}>
-                {signed(pool.profit)}
-              </td>
-              <td className="muted">
-                <strong>{won(pool.balance)}</strong>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+        <div className="card">
+          <div className="muted">개인당 예상 손익</div>
+          <div className="stat" style={{ color: profitColor }}>
+            {signed(per.profit)}
+          </div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            개인 출자 {won(per.contribution)}
+          </div>
+        </div>
+        <div className="card">
+          <div className="muted">개인당 현재 잔액</div>
+          <div className="stat">{won(per.balance)}</div>
+        </div>
       </div>
     </>
   );

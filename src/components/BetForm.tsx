@@ -28,16 +28,45 @@ function SubmitButton() {
 export function BetForm({
   matches,
   oddsByMatch,
+  initialMatchId,
+  initialPick,
+  embedded,
+  onSuccess,
 }: {
   matches: MatchOption[];
   oddsByMatch: Record<string, OddsTriple>;
+  /** 승부식에서 넘어올 때 미리 선택할 경기 id */
+  initialMatchId?: string;
+  /** 승부식 배당 버튼에서 넘어올 때 미리 선택할 승/무/패 */
+  initialPick?: Outcome;
+  /** 승부식 인라인 패널 안에 임베드할 때(제목 숨김 등 컴팩트) */
+  embedded?: boolean;
+  /** 등록 성공 시 콜백(인라인 패널 닫기 등) */
+  onSuccess?: () => void;
 }) {
   const [state, formAction] = useFormState(createBetAction, initial);
   const formRef = useRef<HTMLFormElement>(null);
-  const [matchId, setMatchId] = useState('');
-  const [pick, setPick] = useState<Outcome | ''>('');
-  const [odds, setOdds] = useState('');
+  // 승부식에서 경기를 눌러 넘어온 경우 해당 경기를 미리 선택.
+  const presetMatchId =
+    initialMatchId && matches.some((m) => m.id === initialMatchId)
+      ? initialMatchId
+      : '';
+  const [matchId, setMatchId] = useState(presetMatchId);
+  const [pick, setPick] = useState<Outcome | ''>(initialPick ?? '');
+  const [odds, setOdds] = useState(() => {
+    const t = presetMatchId ? oddsByMatch[presetMatchId] : undefined;
+    if (t && initialPick) {
+      const v =
+        initialPick === 'HOME' ? t.home : initialPick === 'DRAW' ? t.draw : t.away;
+      return String(v);
+    }
+    return '';
+  });
   const [oddsTouched, setOddsTouched] = useState(false);
+  const [stake, setStake] = useState('');
+  // onSuccess 는 매 렌더 새 함수일 수 있어 ref 로 최신값만 호출(effect 루프 방지).
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
 
   const hasMatches = matches.length > 0;
   const triple = oddsByMatch[matchId];
@@ -48,7 +77,9 @@ export function BetForm({
       setMatchId('');
       setPick('');
       setOdds('');
+      setStake('');
       setOddsTouched(false);
+      onSuccessRef.current?.();
     }
   }, [state]);
 
@@ -74,9 +105,20 @@ export function BetForm({
     { value: 'AWAY', label: selected ? `${selected.away} 승` : '패', odd: triple?.away },
   ];
 
+  // 예상 수령액(= 금액 × 배당) 실시간 계산.
+  const stakeNum = Number(stake);
+  const oddsNum = Number(odds);
+  const expected =
+    stakeNum > 0 && oddsNum > 1 ? Math.round(stakeNum * oddsNum) : null;
+
   return (
-    <form action={formAction} ref={formRef} className="card" style={{ marginBottom: 24 }}>
-      <h2 style={{ marginTop: 0 }}>베팅 등록</h2>
+    <form
+      action={formAction}
+      ref={formRef}
+      className={embedded ? '' : 'card'}
+      style={{ marginBottom: embedded ? 0 : 24 }}
+    >
+      {!embedded && <h2 style={{ marginTop: 0 }}>베팅 등록</h2>}
 
       {!hasMatches && (
         <p className="error" style={{ marginTop: 0 }}>
@@ -85,39 +127,44 @@ export function BetForm({
       )}
 
       <div className="form-grid">
-        <div className="full">
-          <label htmlFor="matchId">경기 (한국 경기 우선 · 날짜 표시)</label>
-          {hasMatches ? (
-            <select
-              id="matchId"
-              name="matchId"
-              value={matchId}
-              onChange={(e) => {
-                setMatchId(e.target.value);
-                setOddsTouched(false);
-                autofillOdds(e.target.value, pick);
-              }}
-              required
-            >
-              <option value="">경기를 선택하세요</option>
-              {matches.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {matchOptionLabel(m)}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              id="matchId"
-              name="matchId"
-              type="text"
-              value={matchId}
-              onChange={(e) => setMatchId(e.target.value)}
-              placeholder="예: 대한민국 vs 브라질"
-              required
-            />
-          )}
-        </div>
+        {embedded ? (
+          // 인라인(경기 고정): 콤보박스 불필요 — 숨김 필드만.
+          <input type="hidden" name="matchId" value={matchId} />
+        ) : (
+          <div className="full">
+            <label htmlFor="matchId">경기 (한국 경기 우선 · 날짜 표시)</label>
+            {hasMatches ? (
+              <select
+                id="matchId"
+                name="matchId"
+                value={matchId}
+                onChange={(e) => {
+                  setMatchId(e.target.value);
+                  setOddsTouched(false);
+                  autofillOdds(e.target.value, pick);
+                }}
+                required
+              >
+                <option value="">경기를 선택하세요</option>
+                {matches.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {matchOptionLabel(m)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id="matchId"
+                name="matchId"
+                type="text"
+                value={matchId}
+                onChange={(e) => setMatchId(e.target.value)}
+                placeholder="예: 대한민국 vs 브라질"
+                required
+              />
+            )}
+          </div>
+        )}
 
         <div className="full">
           <label>선택 (승/무/패) — 괄호는 베트맨 배당</label>
@@ -181,20 +228,22 @@ export function BetForm({
             type="number"
             step="1000"
             min="1000"
+            value={stake}
+            onChange={(e) => setStake(e.target.value)}
             placeholder="예: 30000"
             required
           />
         </div>
 
-        <div>
-          <label htmlFor="placedBy">건 사람</label>
-          <input id="placedBy" name="placedBy" type="text" placeholder="예: 철수" required />
-        </div>
-
-        <div>
-          <label htmlFor="note">메모 (선택)</label>
-          <input id="note" name="note" type="text" placeholder="비고" />
-        </div>
+        {expected != null && (
+          <div className="full payout-preview">
+            예상 수령액 <b>{expected.toLocaleString('ko-KR')}원</b>
+            <span className="muted">
+              {' '}
+              (순이익 +{(expected - Math.round(stakeNum)).toLocaleString('ko-KR')}원)
+            </span>
+          </div>
+        )}
 
         <div className="full btn-row">
           <SubmitButton />

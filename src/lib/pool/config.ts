@@ -20,13 +20,22 @@ export interface PoolConfig {
 
 export const POOL: PoolConfig = {
   members: [
-    { id: 'me', name: '나', contribution: 50000 },
-    { id: 'friend1', name: '친구A', contribution: 50000 },
-    { id: 'friend2', name: '친구B', contribution: 50000 },
+    { id: 'junhyeok', name: '임준혁', contribution: 50000 },
+    { id: 'junhwan', name: '양준환', contribution: 50000 },
+    { id: 'inwoo', name: '전인우', contribution: 50000 },
   ],
   defaultStake: 30000,
   currency: '원',
 };
+
+/** 의견/합의 기능에서 쓰는 고정 멤버 이름 목록(=베팅 참여 3인). 합의 판정 대상. */
+export const MEMBERS: string[] = POOL.members.map((m) => m.name);
+
+/** 참고 의견만 내는 인물(합의에는 영향 없음). */
+export const ADVISORY_MEMBERS: string[] = ['김민석'];
+
+/** 의견을 입력/표시하는 전체 인물(3인 + 참고인). */
+export const OPINION_MEMBERS: string[] = [...MEMBERS, ...ADVISORY_MEMBERS];
 
 /** 초기 자본 = 멤버 출자액 합계 (예: 3명 × 5만 = 15만) */
 export const INITIAL_CAPITAL = POOL.members.reduce(

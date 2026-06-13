@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getMatches, getOdds } from '@/lib/data-sources';
-import { listBets } from '@/lib/bets/store';
+import { listBetsSettled } from '@/lib/bets/store';
 import { computePoolBalance } from '@/lib/pool/balance';
 import { MatchList, type OddsTriple } from '@/components/MatchList';
 import { AutoRefresh } from '@/components/AutoRefresh';
@@ -21,11 +21,11 @@ const statusLabel: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const [{ matches, source }, bets, { odds }] = await Promise.all([
+  const [{ matches, source }, { odds }] = await Promise.all([
     getMatches(),
-    listBets(),
     getOdds(),
   ]);
+  const bets = await listBetsSettled(matches);
   const pool = computePoolBalance(bets);
 
   const oddsByMatch: Record<string, OddsTriple> = {};
@@ -116,6 +116,7 @@ export default async function DashboardPage() {
               <tr>
                 <th>경기</th>
                 <th>선택</th>
+                <th>배당</th>
                 <th>금액</th>
                 <th>상태</th>
                 <th>수령</th>
@@ -126,6 +127,7 @@ export default async function DashboardPage() {
                 <tr key={b.id}>
                   <td>{matchKorName.get(b.matchId) ?? b.matchId}</td>
                   <td>{pickLabel[b.pick] ?? b.pick}</td>
+                  <td>{b.oddsAtPlacement.toFixed(2)}</td>
                   <td>{won(b.stake)}</td>
                   <td>{statusLabel[b.status] ?? b.status}</td>
                   <td>{b.payout != null ? won(b.payout) : '-'}</td>

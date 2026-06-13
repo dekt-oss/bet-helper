@@ -48,28 +48,20 @@ export function computePoolBalance(bets: Bet[]): PoolBalance {
   };
 }
 
-export interface MemberShare {
-  id: string;
-  name: string;
-  contribution: number;
-  /** 손익을 출자비율로 나눈 몫 */
-  profitShare: number;
-  /** 현재 지분 가치 = 출자액 + 손익몫 */
-  equity: number;
+export interface PerPerson {
+  count: number; // 인원수
+  contribution: number; // 개인당 출자액
+  profit: number; // 개인당 손익(균등)
+  balance: number; // 개인당 현재 잔액(균등)
 }
 
-/** 손익을 출자비율대로 나눠 멤버별 지분 가치를 계산한다. */
-export function computeMemberShares(profit: number): MemberShare[] {
-  const total = INITIAL_CAPITAL || 1;
-  return POOL.members.map((m) => {
-    const ratio = m.contribution / total;
-    const profitShare = Math.round(profit * ratio);
-    return {
-      id: m.id,
-      name: m.name,
-      contribution: m.contribution,
-      profitShare,
-      equity: m.contribution + profitShare,
-    };
-  });
+/** 출자가 동일하므로 손익/잔액을 인원수로 균등 분배한 개인당 수치. */
+export function computePerPerson(pool: PoolBalance): PerPerson {
+  const count = POOL.members.length || 1;
+  return {
+    count,
+    contribution: Math.round(pool.initial / count),
+    profit: Math.round(pool.profit / count),
+    balance: Math.round(pool.balance / count),
+  };
 }

@@ -248,6 +248,30 @@ interface VenueInfo {
   offset?: number; // 개최지 UTC 오프셋(분). 못 구하면 기본값 폴백.
 }
 
+// worldcup26 는 knockout 라운드코드(R32/SF 등)를 group 필드에 넣는다.
+// A~L 만 진짜 조별리그이고, 그 외는 토너먼트 스테이지 토큰으로 정규화한다.
+const KNOCKOUT_CODE: Record<string, string> = {
+  r32: 'round32', round32: 'round32', roundof32: 'round32', last32: 'round32',
+  r16: 'round16', round16: 'round16', roundof16: 'round16', last16: 'round16',
+  qf: 'quarter', quarter: 'quarter', quarterfinal: 'quarter', round8: 'quarter',
+  sf: 'semi', semi: 'semi', semifinal: 'semi', round4: 'semi',
+  f: 'final', final: 'final',
+  '3p': 'third', tp: 'third', third: 'third', thirdplace: 'third',
+};
+
+export function mapStage(group?: string, type?: string): string | undefined {
+  const t = (type ?? '').trim().toLowerCase();
+  const norm = (x: string) => x.replace(/[\s._-]/g, '');
+  // type 이 'group' 이 아니면 토너먼트 → 코드/타입을 표준 토큰으로.
+  // (그래야 'F'(Final)가 'Group F' 로 오인되지 않음)
+  if (t && t !== 'group') return KNOCKOUT_CODE[norm(t)] ?? t;
+  const g = (group ?? '').trim();
+  if (/^[A-L]$/i.test(g)) return `Group ${g.toUpperCase()}`;
+  // type 이 비었거나 'group' 인데 group 이 A~L 이 아님 → 라운드코드일 수 있어 변환 시도.
+  const key = norm((g || t).toLowerCase());
+  return KNOCKOUT_CODE[key] ?? (g || t || undefined);
+}
+
 function gameToMatch(g: WcGame, venues: Map<string, VenueInfo>): Match {
   const status = deriveStatus(g);
   const started = status !== 'SCHEDULED';
@@ -258,7 +282,7 @@ function gameToMatch(g: WcGame, venues: Map<string, VenueInfo>): Match {
   return {
     id: `wc2026-${g.id}`,
     competition: 'FIFA World Cup 2026',
-    stage: g.group ? `Group ${g.group}` : (g.type ?? undefined),
+    stage: mapStage(g.group, g.type),
     // 개최지별 시간대로 환산(없으면 기본 -360).
     kickoff: toKickoffIso(g.local_date, venue?.offset ?? TZ_OFFSET_MIN),
     status,
@@ -375,7 +399,7 @@ function safeJson(text: string): unknown {
 /** worldcup26.ir 전체 경기를 우리 Match 로 정규화해 반환. */
 export async function fetchWorldcup26Matches(): Promise<Match[]> {
   const [body, venues] = await Promise.all([
-    apiGet<{ games?: WcGame[] }>('/get/games', 60),
+    apiGet<{ games?: WcGame[] }>('/get/games', 300),
     fetchStadiums(),
   ]);
   const games = body.games ?? [];

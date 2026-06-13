@@ -24,6 +24,11 @@ export function RealtimeBets() {
         { event: '*', schema: 'public', table: 'odds' },
         () => router.refresh(),
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'opinions' },
+        () => router.refresh(),
+      )
       .subscribe();
     return () => {
       sb.removeChannel(channel);
