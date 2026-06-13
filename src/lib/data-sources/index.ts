@@ -14,7 +14,7 @@ import {
   matchOddsToMatches,
 } from './betman';
 import { fetchWorldCupOdds, isOddsApiConfigured } from './theOddsApi';
-import { listOdds } from '@/lib/odds/store';
+import { listOdds, upsertOdds } from '@/lib/odds/store';
 
 /**
  * 경기 목록을 가져온다.
@@ -66,18 +66,30 @@ export async function getOdds(): Promise<OddsResult> {
   const scraper = isBetmanEnabled();
   const api = isOddsApiConfigured();
   const [dbOdds, { matches }] = await Promise.all([listOdds(), getMatches()]);
-  // 우선순위: 수동 입력(DB) > 자동 배당 API > 베트맨 스크래퍼
-  const map = new Map<string, Odds>(dbOdds.map((o) => [o.matchId, o]));
+
+  // DB 배당을 (1) 수동/베트맨 입력 과 (2) 자동 배당 스냅샷('oddsapi') 으로 분리한다.
+  //  - 수동 입력: 항상 최우선.
+  //  - 스냅샷: 라이브 API 가 더 이상 주지 않는(=종료된) 경기의 마지막 배당을 채우는 폴백.
+  const manual = new Map<string, Odds>();
+  const snapshot = new Map<string, Odds>();
+  for (const o of dbOdds) (o.source === 'oddsapi' ? snapshot : manual).set(o.matchId, o);
+
+  // 우선순위: 수동 입력 > 라이브 자동 배당 > 스냅샷(종료 경기) > 베트맨 스크래퍼
+  const map = new Map<string, Odds>(manual);
 
   if (api) {
     try {
-      for (const o of await fetchWorldCupOdds(matches)) {
-        if (!map.has(o.matchId)) map.set(o.matchId, o);
-      }
+      const fresh = await fetchWorldCupOdds(matches);
+      for (const o of fresh) if (!map.has(o.matchId)) map.set(o.matchId, o);
+      // 라이브에서 받은 배당을 스냅샷으로 저장 → 경기 종료 후에도 계속 표시한다.
+      await snapshotOdds(fresh, manual, snapshot);
     } catch (err) {
       console.warn('[data] The Odds API 실패(무시):', err);
     }
   }
+
+  // 종료되어 라이브 API 에서 빠진 경기는 마지막 스냅샷 배당으로 채운다.
+  for (const [id, o] of snapshot) if (!map.has(id)) map.set(id, o);
 
   if (scraper) {
     try {
@@ -88,4 +100,35 @@ export async function getOdds(): Promise<OddsResult> {
     }
   }
   return { odds: [...map.values()], scraper, api };
+}
+
+/**
+ * 라이브 자동 배당을 DB 에 스냅샷으로 보존한다(종료 경기 배당 유지용).
+ * - 수동 입력이 있는 경기는 덮어쓰지 않는다.
+ * - 경기에 매칭되지 않은 자동 배당('oddsapi-...')은 저장하지 않는다.
+ * - 값이 바뀐 경우에만 기록해 불필요한 쓰기를 줄인다(베스트 에포트, 실패 무시).
+ */
+async function snapshotOdds(
+  fresh: Odds[],
+  manual: Map<string, Odds>,
+  snapshot: Map<string, Odds>,
+): Promise<void> {
+  for (const o of fresh) {
+    if (o.matchId.startsWith('oddsapi-')) continue;
+    if (manual.has(o.matchId)) continue;
+    const prev = snapshot.get(o.matchId);
+    if (prev && prev.home === o.home && prev.draw === o.draw && prev.away === o.away)
+      continue;
+    try {
+      await upsertOdds({
+        matchId: o.matchId,
+        home: o.home,
+        draw: o.draw,
+        away: o.away,
+        source: 'oddsapi',
+      });
+    } catch (err) {
+      console.warn('[data] 배당 스냅샷 저장 실패(무시):', err);
+    }
+  }
 }
