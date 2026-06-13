@@ -148,15 +148,19 @@ function num(s: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// worldcup26.ir 의 local_date 는 이란(테헤란, UTC+3:30) 기준이다.
-// (persian_date 와 시:분이 동일 → 테헤란 시계). 분 단위 오프셋으로 UTC 로 환산한다.
-// 혹시 다른 기준이면 WORLDCUP26_TZ_OFFSET_MINUTES 로 조정(테헤란=210, 한국=540, UTC=0).
+// worldcup26.ir 의 local_date 는 경기장 현지시간이다(멕시코 개최지 = UTC-6).
+// 체코전(=Estadio Akron, 과달라하라): local 20:00 → 실제 한국시간 11:00 로 확인됨.
+// 개최지가 여러 시간대(US 동/중/서부, 캐나다)면 경기별로 다를 수 있어 오프셋을
+// WORLDCUP26_TZ_OFFSET_MINUTES 로 조정 가능(UTC-6=-360, 동부 EDT=-240, 서부 PDT=-420).
 const TZ_OFFSET_MIN = Number(
-  process.env.WORLDCUP26_TZ_OFFSET_MINUTES ?? 210,
+  process.env.WORLDCUP26_TZ_OFFSET_MINUTES ?? -360,
 );
 
-function toKickoffIso(local?: string): string {
-  // "MM/DD/YYYY HH:mm" 를 TZ_OFFSET_MIN 시간대의 벽시계로 보고 UTC 로 환산.
+export function toKickoffIso(
+  local?: string,
+  offsetMin: number = TZ_OFFSET_MIN,
+): string {
+  // "MM/DD/YYYY HH:mm" 를 offsetMin 시간대의 벽시계로 보고 UTC 로 환산.
   if (!local) return new Date(0).toISOString();
   const m = local.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ T]+(\d{1,2}):(\d{2})/);
   if (!m) {
@@ -164,12 +168,11 @@ function toKickoffIso(local?: string): string {
     return Number.isNaN(d.getTime()) ? new Date(0).toISOString() : d.toISOString();
   }
   const [, mo, day, y, h, mi] = m;
-  const utcMs =
-    Date.UTC(+y, +mo - 1, +day, +h, +mi) - TZ_OFFSET_MIN * 60_000;
+  const utcMs = Date.UTC(+y, +mo - 1, +day, +h, +mi) - offsetMin * 60_000;
   return new Date(utcMs).toISOString();
 }
 
-function parseScorers(raw: string | undefined): string[] {
+export function parseScorers(raw: string | undefined): string[] {
   if (!raw) return [];
   // 원본 예: {“J. Quiñones 9'”,”R. Jiménez 67'”} — 중괄호/곡선따옴표 제거(분 표기 ' 는 유지).
   const cleaned = raw.replace(/[{}“”"]/g, '').trim();
@@ -180,7 +183,7 @@ function parseScorers(raw: string | undefined): string[] {
     .filter((s) => s && s.toLowerCase() !== 'null');
 }
 
-function deriveStatus(g: WcGame): Match['status'] {
+export function deriveStatus(g: WcGame): Match['status'] {
   const t = (g.time_elapsed ?? '').toLowerCase().trim();
   if (g.finished === 'TRUE' || ['ft', 'finished', 'fulltime', 'full-time'].includes(t))
     return 'FINISHED';
