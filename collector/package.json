@@ -9,7 +9,8 @@
     "login": "node collect.js --login-only --headful",
     "capture": "node collect.js --capture-only --headful",
     "once": "node collect.js --once",
-    "start": "node collect.js"
+    "start": "node collect.js",
+    "send": "node send.js"
   },
   "dependencies": {
     "dotenv": "16.4.5",
