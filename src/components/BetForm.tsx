@@ -12,6 +12,10 @@ export interface OddsTriple {
   home: number;
   draw: number;
   away: number;
+  /** 배당 출처: 'betman'(베트맨) | 'oddsapi'(자동) | 'manual'(수동). 표시용(선택). */
+  source?: string;
+  /** 마지막 갱신 시각(ISO). 표시용(선택). */
+  updatedAt?: string;
 }
 
 const initial: ActionState = { ok: false };
