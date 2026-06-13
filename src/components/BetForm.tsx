@@ -127,39 +127,44 @@ export function BetForm({
       )}
 
       <div className="form-grid">
-        <div className="full">
-          <label htmlFor="matchId">경기 (한국 경기 우선 · 날짜 표시)</label>
-          {hasMatches ? (
-            <select
-              id="matchId"
-              name="matchId"
-              value={matchId}
-              onChange={(e) => {
-                setMatchId(e.target.value);
-                setOddsTouched(false);
-                autofillOdds(e.target.value, pick);
-              }}
-              required
-            >
-              <option value="">경기를 선택하세요</option>
-              {matches.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {matchOptionLabel(m)}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              id="matchId"
-              name="matchId"
-              type="text"
-              value={matchId}
-              onChange={(e) => setMatchId(e.target.value)}
-              placeholder="예: 대한민국 vs 브라질"
-              required
-            />
-          )}
-        </div>
+        {embedded ? (
+          // 인라인(경기 고정): 콤보박스 불필요 — 숨김 필드만.
+          <input type="hidden" name="matchId" value={matchId} />
+        ) : (
+          <div className="full">
+            <label htmlFor="matchId">경기 (한국 경기 우선 · 날짜 표시)</label>
+            {hasMatches ? (
+              <select
+                id="matchId"
+                name="matchId"
+                value={matchId}
+                onChange={(e) => {
+                  setMatchId(e.target.value);
+                  setOddsTouched(false);
+                  autofillOdds(e.target.value, pick);
+                }}
+                required
+              >
+                <option value="">경기를 선택하세요</option>
+                {matches.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {matchOptionLabel(m)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id="matchId"
+                name="matchId"
+                type="text"
+                value={matchId}
+                onChange={(e) => setMatchId(e.target.value)}
+                placeholder="예: 대한민국 vs 브라질"
+                required
+              />
+            )}
+          </div>
+        )}
 
         <div className="full">
           <label>선택 (승/무/패) — 괄호는 베트맨 배당</label>

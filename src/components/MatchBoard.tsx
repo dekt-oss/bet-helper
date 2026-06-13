@@ -278,27 +278,35 @@ export function MatchBoard({
                         );
                       })}
                     </div>
-                    <button
-                      type="button"
-                      className="opinion-toggle"
-                      onClick={() => setEditOps((v) => !v)}
-                    >
-                      {editOps ? '− 닫기' : '+ 의견 입력/수정'}
-                    </button>
-                    {editOps && (
-                      <div className="opinion-edit-list">
-                        {opinionMembers.map((mem) => (
-                          <OpinionForm
-                            key={mem}
-                            matchId={m.id}
-                            member={mem}
-                            current={opinions.find((o) => o.member === mem)}
-                            homeLabel={home}
-                            awayLabel={away}
-                            advisory={advisoryMembers.includes(mem)}
-                          />
-                        ))}
-                      </div>
+                    {bettable ? (
+                      <>
+                        <button
+                          type="button"
+                          className="opinion-toggle"
+                          onClick={() => setEditOps((v) => !v)}
+                        >
+                          {editOps ? '− 닫기' : '+ 의견 입력/수정'}
+                        </button>
+                        {editOps && (
+                          <div className="opinion-edit-list">
+                            {opinionMembers.map((mem) => (
+                              <OpinionForm
+                                key={mem}
+                                matchId={m.id}
+                                member={mem}
+                                current={opinions.find((o) => o.member === mem)}
+                                homeLabel={home}
+                                awayLabel={away}
+                                advisory={advisoryMembers.includes(mem)}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="muted" style={{ fontSize: 12 }}>
+                        종료된 경기는 의견 입력이 불가합니다.
+                      </p>
                     )}
                   </div>
 
