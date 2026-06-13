@@ -27,18 +27,17 @@ console.log(`
 
 다음 순서대로 진행하세요:
 
-1) collector/.env 를 열어 값 4개만 채우기
-     BETMAN_ID            베트맨 아이디
-     BETMAN_PW            베트맨 비밀번호
+1) collector/.env 를 열어 값 2개만 채우기
      INGEST_URL           앱 도메인 + /api/odds/ingest (풀 URL)
      ODDS_INGEST_TOKEN    Vercel 에 넣은 그 값과 동일 (⚠️ odds api 키 아님, 전송 비밀번호)
+   (베트맨 ID/PW 는 적지 않음 — 다음 단계에서 창에서 직접 로그인)
 
-2) 최초 로그인 1회 (창이 뜸 — 캡차 있으면 직접 통과):
+2) 최초 로그인 1회 (크롬 창이 뜸 — 평소처럼 직접 로그인 후 터미널에서 Enter):
      npm run login
 
 3) 실데이터 캡처 (앱 파서 보정용, 1회):
      npm run capture
-     → captures/ 의 json 을 보고 betman.ts 필드 보정 (README 참고)
+     → captures/ 의 json 내용을 개발자에게 전달하면 파서를 맞춰줌
 
 4) 무인 자동 실행:
      npm start                         (이 창에서 계속 돌림)

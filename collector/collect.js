@@ -1,29 +1,29 @@
-// 베트맨 승부식(1X2) 배당 자동 수집 에이전트 — 사용자 본인 PC/홈서버(가정용 IP)에서 실행.
+// 베트맨 승부식(1X2) 배당 자동 수집 에이전트 — 사용자 본인 PC(가정용 IP)에서 실행.
 //
-// 흐름: 세션 복원/자동 로그인 → 승부식 페이지에서 gameSlip.do 응답(raw) 캡처
-//       → bet-helper 앱의 /api/odds/ingest 로 POST(x-ingest-token).
-// 파싱·매칭·저장은 앱(ingestBetmanRaw → parseBetmanGameSlip → upsertOdds)이 전담한다.
-// 이 스크립트는 "정상 방문자로서" 본인 세션 쿠키로 화면에 보이는 배당을 가져올 뿐이며,
-// 프록시/IP 로테이션/안티봇 무력화 같은 우회 장치는 일절 사용하지 않는다.
+// 로그인 정책(중요): 베트맨 로그인은 자동입력/인증서 등으로 헤드리스 완전자동이 어렵다.
+//   → 최초 1회 "뜬 크롬 창에서 직접 로그인"하면 세션(betman-session.json)이 저장되고,
+//     이후에는 그 세션으로 무인 자동 수집한다. 세션 만료 시에만 다시 `npm run login`.
+//   이 방식은 셀렉터 추측에 의존하지 않아 사이트가 바뀌어도 안 깨진다.
+//
+// 흐름: (세션 복원/직접 로그인) → 승부식 페이지의 배당 응답(compSchedules) 캡처
+//       → bet-helper 앱의 /api/odds/ingest 로 POST. 파싱·매칭·저장은 앱이 전담.
 //
 // 실행:
-//   npm run capture   첫 회(헤드풀): 로그인 + raw 를 captures/ 에 덤프(POST 안 함) → 파서 보정용
-//   npm run login     헤드풀 로그인만 수행해 세션(betman-session.json) 시드
-//   npm run once      1회 수집 후 종료(cron 용)
-//   npm start         주기 루프(pm2 용)
-//
-// 환경변수(.env): .env.example 참고. 베트맨 DOM/URL 은 사이트 개편으로 바뀔 수 있어
-// 셀렉터·URL 을 전부 env 로 빼두었다(코드 수정 없이 교체 가능).
+//   npm run login     크롬 창에서 직접 로그인 1회 → 세션 저장
+//   npm run capture   실데이터 캡처 1회(POST 안 함) → 앱 파서 보정용
+//   npm run once      1회 수집 후 종료(cron)
+//   npm start         주기 루프(pm2)
 
 import 'dotenv/config';
 import { chromium } from 'playwright-core';
 import { promises as fs } from 'fs';
 import path from 'path';
+import readline from 'readline';
 import { fileURLToPath } from 'url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-// ── 설정 ──────────────────────────────────────────────────
+// ── 인자/설정 ─────────────────────────────────────────────
 const ARGV = new Set(process.argv.slice(2));
 const ONCE = ARGV.has('--once');
 const CAPTURE_ONLY = ARGV.has('--capture-only');
@@ -31,42 +31,28 @@ const LOGIN_ONLY = ARGV.has('--login-only');
 const HEADFUL = ARGV.has('--headful');
 
 const cfg = {
-  id: process.env.BETMAN_ID ?? '',
-  pw: process.env.BETMAN_PW ?? '',
   ingestUrl: process.env.INGEST_URL ?? '',
   ingestToken: process.env.ODDS_INGEST_TOKEN ?? '',
 
-  // 베트맨 URL (사이트 개편 시 .env 로 교체)
-  loginUrl:
-    process.env.BETMAN_LOGIN_URL ?? 'https://www.betman.co.kr/main/mainPage/member/loginPage.do',
+  homeUrl: process.env.BETMAN_HOME_URL ?? 'https://www.betman.co.kr/',
+  // 회원 전용(승부식) 페이지 — 로그인 여부 판별 & 배당 캡처 대상
   protoUrl:
     process.env.BETMAN_PROTO_URL ??
-    'https://www.betman.co.kr/main/mainPage/gamebuy/protoMatchList.do',
-  // 캡처 대상 응답 URL 식별 패턴(부분 일치, 콤마 구분 가능)
+    'https://www.betman.co.kr/main/mainPage/gamebuy/gameBuyMain.do',
+  // 캡처 대상 응답 URL 부분 일치(콤마). 비워도 본문에 compSchedules 있으면 자동 인식.
   slipUrlMatch: (process.env.GAMESLIP_URL_MATCH ?? 'gameSlip.do,protoMatchList.do')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
 
-  // 로그인 폼 셀렉터(베트맨 DevTools 로 확인 후 .env 로 교체 권장)
-  idSel: process.env.BETMAN_ID_SELECTOR ?? '#id, input[name="userId"], input[name="loginId"]',
-  pwSel: process.env.BETMAN_PW_SELECTOR ?? '#pw, input[name="password"], input[name="loginPw"]',
-  submitSel:
-    process.env.BETMAN_SUBMIT_SELECTOR ??
-    'button[type="submit"], a.btn_login, #loginBtn, .login_btn',
-  // 로그인 성공 마커(로그인 후에만 보이는 요소). 비어있으면 URL 변화로 판단.
-  loggedInSel: process.env.BETMAN_LOGGEDIN_SELECTOR ?? 'a[href*="logout"], .logout, #logout',
-
-  // 설치된 브라우저 사용(별도 다운로드 없음). chrome → msedge 순으로 시도.
   channel: process.env.BROWSER_CHANNEL ?? '',
   headless: HEADFUL ? false : (process.env.HEADLESS ?? 'true') !== 'false',
   intervalMin: Number(process.env.INTERVAL_MINUTES ?? '12'),
   jitterSec: Number(process.env.JITTER_SECONDS ?? '120'),
   sessionFile: process.env.SESSION_FILE ?? path.join(HERE, 'betman-session.json'),
   capturesDir: path.join(HERE, 'captures'),
-  navTimeout: Number(process.env.NAV_TIMEOUT_MS ?? '20000'),
+  navTimeout: Number(process.env.NAV_TIMEOUT_MS ?? '30000'),
 
-  // betman.ts 의 BETMAN_HEADERS UA 와 동일하게 맞춤(일관성).
   userAgent:
     process.env.BETMAN_USER_AGENT ??
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -78,10 +64,18 @@ const log = (...a) => console.info(`[collector ${new Date().toISOString()}]`, ..
 const warn = (...a) => console.warn(`[collector ${new Date().toISOString()}]`, ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function waitForEnter(prompt) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(prompt, () => {
+      rl.close();
+      resolve();
+    });
+  });
+}
+
 function requireConfig() {
   const missing = [];
-  if (!cfg.id) missing.push('BETMAN_ID');
-  if (!cfg.pw) missing.push('BETMAN_PW');
   if (!CAPTURE_ONLY && !LOGIN_ONLY) {
     if (!cfg.ingestUrl) missing.push('INGEST_URL');
     if (!cfg.ingestToken) missing.push('ODDS_INGEST_TOKEN');
@@ -100,157 +94,11 @@ async function fileExists(p) {
   }
 }
 
-function urlMatchesSlip(url) {
-  return cfg.slipUrlMatch.some((m) => url.includes(m));
+function urlLooksLoggedOut(url) {
+  return /accessDenied|loginPage|\/login/i.test(url);
 }
 
-// ── 핵심 단계 ─────────────────────────────────────────────
-
-/** 로그인 상태인지 페이지에서 확인. 마커 셀렉터가 보이면 true. */
-async function isLoggedIn(page) {
-  if (!cfg.loggedInSel) return false;
-  try {
-    const el = await page.$(cfg.loggedInSel);
-    return Boolean(el);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 자동 로그인. 성공 시 storageState 를 저장한다.
- * 캡차/2FA/구조변경으로 실패하면 명확한 안내와 함께 throw(이번 사이클만 실패).
- */
-async function login(context, page) {
-  log('로그인 시도…');
-  await page.goto(cfg.loginUrl, { waitUntil: 'domcontentloaded', timeout: cfg.navTimeout });
-
-  // 이미 로그인된 세션이면 스킵
-  if (await isLoggedIn(page)) {
-    log('이미 로그인 상태(세션 유효).');
-    return;
-  }
-
-  const idInput = await page.waitForSelector(cfg.idSel, { timeout: cfg.navTimeout }).catch(() => null);
-  const pwInput = await page.$(cfg.pwSel);
-  if (!idInput || !pwInput) {
-    throw new Error(
-      '로그인 입력란을 못 찾음. 베트맨 로그인 페이지 구조가 바뀌었거나 셀렉터(.env BETMAN_ID/PW_SELECTOR)가 틀림. ' +
-        'HEADLESS=false(npm run login)로 직접 확인하세요.',
-    );
-  }
-  await idInput.fill(cfg.id);
-  await pwInput.fill(cfg.pw);
-
-  await Promise.all([
-    page.waitForLoadState('networkidle', { timeout: cfg.navTimeout }).catch(() => {}),
-    page.click(cfg.submitSel).catch(async () => {
-      // 버튼 못 누르면 Enter 로 제출 시도
-      await pwInput.press('Enter').catch(() => {});
-    }),
-  ]);
-  await sleep(1500);
-
-  if (!(await isLoggedIn(page))) {
-    throw new Error(
-      '로그인 실패(캡차/2FA/자격증명 오류 가능). HEADLESS=false(npm run login)로 1회 수동 로그인해 ' +
-        '세션을 시드한 뒤 헤드리스로 재사용하세요.',
-    );
-  }
-  await context.storageState({ path: cfg.sessionFile });
-  log(`로그인 성공 → 세션 저장(${path.basename(cfg.sessionFile)}).`);
-}
-
-/**
- * 승부식 페이지를 열어 배당 응답(raw)을 네트워크 인터셉트로 캡처.
- * URL 패턴(.env)뿐 아니라 **응답 본문에 `compSchedules` 가 있으면 자동 인식** →
- * 사용자가 정확한 XHR URL 을 몰라도 동작(설정 최소화).
- */
-async function captureSlip(page) {
-  let raw = null;
-  const onResponse = async (res) => {
-    if (raw) return;
-    const type = res.request().resourceType();
-    if (type !== 'xhr' && type !== 'fetch' && type !== 'document') return;
-    try {
-      const byUrl = urlMatchesSlip(res.url());
-      const text = await res.text();
-      if (!text || !text.trim()) return;
-      if (byUrl || text.includes('compSchedules')) raw = text;
-    } catch {
-      /* 본문 못 읽으면 무시 */
-    }
-  };
-  page.on('response', onResponse);
-  try {
-    await page.goto(cfg.protoUrl, { waitUntil: 'networkidle', timeout: cfg.navTimeout });
-    // XHR 가 지연 로딩될 수 있어 잠시 더 대기
-    for (let i = 0; i < 10 && !raw; i++) await sleep(800);
-  } finally {
-    page.off('response', onResponse);
-  }
-  return raw;
-}
-
-async function dumpCapture(raw) {
-  await fs.mkdir(cfg.capturesDir, { recursive: true });
-  const file = path.join(cfg.capturesDir, `gameSlip-${Date.now()}.json`);
-  await fs.writeFile(file, raw, 'utf-8');
-  log(`캡처 저장: ${path.relative(HERE, file)} (${raw.length} bytes)`);
-  log('→ 이 파일의 compSchedules.keys 를 보고 src/lib/data-sources/betman.ts 의 필드/필터를 보정하세요.');
-}
-
-async function postToIngest(raw) {
-  const res = await fetch(cfg.ingestUrl, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-ingest-token': cfg.ingestToken },
-    body: JSON.stringify({ raw }),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    warn(`ingest 실패 HTTP ${res.status}:`, body);
-    if (res.status === 422) {
-      warn('422 = 승부식 파싱 0건. npm run capture 로 실데이터를 떠서 betman.ts 필드를 보정하세요.');
-    }
-    return;
-  }
-  log(`ingest 성공: ${JSON.stringify(body)}`);
-}
-
-/** 한 사이클: (필요시)로그인 → 캡처 → (캡처덤프|POST). 브라우저 컨텍스트 재사용. */
-async function runCycle(context) {
-  const page = await context.newPage();
-  try {
-    if (!(await isLoggedIn(page))) {
-      // 세션 페이지 직접 확인을 위해 메인/로그인 페이지 방문은 login() 내부에서 수행
-      await login(context, page);
-    }
-    if (LOGIN_ONLY) {
-      log('로그인만 수행(--login-only) 완료.');
-      return;
-    }
-
-    const raw = await captureSlip(page);
-    if (!raw) {
-      warn('gameSlip 응답을 캡처하지 못함. 승부식 탭/URL(.env BETMAN_PROTO_URL, GAMESLIP_URL_MATCH) 확인 필요.');
-      return;
-    }
-    if (CAPTURE_ONLY) {
-      await dumpCapture(raw);
-      return;
-    }
-    // 정상 경로: 캡처본도 남기고(최근 1개 디버그용) ingest 전송
-    await dumpCapture(raw).catch(() => {});
-    await postToIngest(raw);
-  } finally {
-    await page.close().catch(() => {});
-  }
-}
-
-/**
- * 설치된 Chrome(또는 Edge)을 사용해 브라우저를 띄운다.
- * playwright-core 는 브라우저를 번들하지 않으므로 시스템 브라우저(channel)를 쓴다 → 가볍다.
- */
+// ── 브라우저 ──────────────────────────────────────────────
 async function launchBrowser() {
   const channels = cfg.channel ? [cfg.channel] : ['chrome', 'msedge'];
   let lastErr;
@@ -269,6 +117,162 @@ async function launchBrowser() {
   );
 }
 
+// ── 로그인 ────────────────────────────────────────────────
+
+/** 회원 전용 페이지로 이동했을 때 로그인 필요 페이지로 안 튕기면 로그인된 것. */
+async function probeLoggedIn(page) {
+  try {
+    await page.goto(cfg.protoUrl, { waitUntil: 'domcontentloaded', timeout: cfg.navTimeout });
+    if (urlLooksLoggedOut(page.url())) return false;
+    const body = await page.content().catch(() => '');
+    if (body.includes('로그인이 필요')) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 뜬 창에서 사용자가 직접 로그인 → Enter → 세션 저장. (셀렉터 추측 의존 없음) */
+async function manualLogin(context, page) {
+  log('▶ 열린 크롬 창에서 베트맨에 "직접" 로그인하세요(아이디/비번/인증 등 사이트 방식대로).');
+  await page.goto(cfg.homeUrl, { waitUntil: 'domcontentloaded', timeout: cfg.navTimeout }).catch(
+    () => {},
+  );
+  await waitForEnter('   로그인을 모두 마쳤으면 이 창에서 Enter 를 누르세요… ');
+  if (await probeLoggedIn(page)) {
+    await context.storageState({ path: cfg.sessionFile });
+    log(`로그인 확인 → 세션 저장 완료(${path.basename(cfg.sessionFile)}). 이후엔 무인 자동.`);
+    return true;
+  }
+  warn('아직 로그인 안 된 것으로 보입니다. 창에서 로그인 완료 후 `npm run login` 을 다시 실행하세요.');
+  return false;
+}
+
+/** 세션 보장: 유효하면 통과, 아니면 (headful)직접 로그인 / (headless)재시드 안내 throw. */
+async function ensureSession(context, page) {
+  if (await probeLoggedIn(page)) {
+    log('세션 유효.');
+    return true;
+  }
+  if (cfg.headless) {
+    throw new Error(
+      '세션이 없거나 만료됨. 먼저 `npm run login`(크롬 창이 뜸)으로 1회 직접 로그인해 세션을 시드하세요.',
+    );
+  }
+  return manualLogin(context, page);
+}
+
+// ── 배당 캡처 ─────────────────────────────────────────────
+
+function makeSlipListener(state) {
+  return async (res) => {
+    if (state.raw) return;
+    const type = res.request().resourceType();
+    if (type !== 'xhr' && type !== 'fetch' && type !== 'document') return;
+    try {
+      const text = await res.text();
+      if (!text || !text.trim()) return;
+      const byUrl = cfg.slipUrlMatch.some((m) => res.url().includes(m));
+      if (byUrl || text.includes('compSchedules')) {
+        state.raw = text;
+        state.url = res.url();
+      }
+    } catch {
+      /* 본문 못 읽으면 무시 */
+    }
+  };
+}
+
+/** 자동: 승부식 페이지로 이동해 배당 응답을 캡처. */
+async function captureAuto(page) {
+  const state = { raw: null, url: null };
+  const listener = makeSlipListener(state);
+  page.on('response', listener);
+  try {
+    await page.goto(cfg.protoUrl, { waitUntil: 'networkidle', timeout: cfg.navTimeout }).catch(
+      () => {},
+    );
+    for (let i = 0; i < 12 && !state.raw; i++) await sleep(800);
+  } finally {
+    page.off('response', listener);
+  }
+  return state;
+}
+
+/** 캡처 모드: 자동 시도 후 실패하면 사용자가 직접 승부식 페이지로 이동 → Enter. */
+async function captureManual(page) {
+  const state = { raw: null, url: null };
+  const listener = makeSlipListener(state);
+  page.on('response', listener);
+  try {
+    await page.goto(cfg.protoUrl, { waitUntil: 'networkidle', timeout: cfg.navTimeout }).catch(
+      () => {},
+    );
+    for (let i = 0; i < 8 && !state.raw; i++) await sleep(800);
+    if (!state.raw) {
+      log('▶ 자동으로 못 잡았습니다. 크롬 창에서 [프로토 승부식] 월드컵 경기 배당이 보이는 화면으로 이동하세요.');
+      await waitForEnter('   배당이 화면에 보이면 이 창에서 Enter… ');
+      await sleep(800);
+    }
+  } finally {
+    page.off('response', listener);
+  }
+  return state;
+}
+
+async function dumpCapture(state) {
+  await fs.mkdir(cfg.capturesDir, { recursive: true });
+  const file = path.join(cfg.capturesDir, `gameSlip-${Date.now()}.json`);
+  await fs.writeFile(file, state.raw, 'utf-8');
+  log(`캡처 저장: ${path.relative(HERE, file)} (${state.raw.length} bytes)`);
+  if (state.url) log(`캡처된 응답 URL: ${state.url}`);
+  log('→ 이 파일 내용을 개발자에게 전달하면 앱 파서(betman.ts)를 실데이터에 맞춰 보정합니다.');
+}
+
+async function postToIngest(raw) {
+  const res = await fetch(cfg.ingestUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-ingest-token': cfg.ingestToken },
+    body: JSON.stringify({ raw }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    warn(`ingest 실패 HTTP ${res.status}:`, body);
+    if (res.status === 422) {
+      warn('422 = 승부식 파싱 0건. `npm run capture` 로 실데이터를 떠서 앱 betman.ts 필드를 보정하세요.');
+    }
+    return;
+  }
+  log(`ingest 성공: ${JSON.stringify(body)}`);
+}
+
+// ── 사이클 ────────────────────────────────────────────────
+async function runOnce(context) {
+  const page = await context.newPage();
+  try {
+    const ok = await ensureSession(context, page);
+    if (!ok) return;
+    if (LOGIN_ONLY) {
+      log('로그인 시드 완료. 이제 `npm run capture` 또는 `npm start` 를 실행하세요.');
+      return;
+    }
+
+    const state = CAPTURE_ONLY ? await captureManual(page) : await captureAuto(page);
+    if (!state.raw) {
+      warn('배당 응답을 캡처하지 못했습니다. 승부식 URL(.env BETMAN_PROTO_URL)을 확인하거나 `npm run capture` 로 직접 시도하세요.');
+      return;
+    }
+    if (CAPTURE_ONLY) {
+      await dumpCapture(state);
+      return;
+    }
+    await dumpCapture(state).catch(() => {});
+    await postToIngest(state.raw);
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
 async function main() {
   requireConfig();
 
@@ -285,13 +289,13 @@ async function main() {
   const single = ONCE || CAPTURE_ONLY || LOGIN_ONLY;
   try {
     if (single) {
-      await runCycle(context);
+      await runOnce(context);
     } else {
       log(`주기 수집 시작: ${cfg.intervalMin}분 ± ${cfg.jitterSec}초 (Ctrl+C 종료)`);
       // eslint-disable-next-line no-constant-condition
       while (true) {
         try {
-          await runCycle(context);
+          await runOnce(context);
         } catch (err) {
           warn('사이클 실패(다음 주기 재시도):', err?.message ?? err);
         }

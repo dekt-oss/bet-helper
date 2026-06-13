@@ -27,15 +27,17 @@ npm install        # 가벼움: playwright-core + dotenv 만 (Chromium 다운로
 npm run setup      # .env 생성 + 다음 단계 안내
 ```
 
-그다음 `collector/.env` 에서 **값 4개만** 채운다:
-- `BETMAN_ID`, `BETMAN_PW` — 베트맨 로그인 (이 파일에만 둔다. Vercel/GitHub 에 넣지 않음)
+그다음 `collector/.env` 에서 **값 2개만** 채운다:
 - `INGEST_URL` — 예: `https://<앱>.vercel.app/api/odds/ingest`
-- `ODDS_INGEST_TOKEN` — **앱(Vercel) env 의 `ODDS_INGEST_TOKEN` 과 같은 값**
+- `ODDS_INGEST_TOKEN` — **앱(Vercel) env 의 `ODDS_INGEST_TOKEN` 과 같은 값** (⚠️ the-odds-api 키 아님)
+
+> 베트맨 ID/PW 는 `.env` 에 적지 않는다. 로그인은 아래 `npm run login` 에서 **뜬 창에 직접** 한다
+> (셀렉터 추측에 의존하지 않아 더 안정적). 한 번 로그인하면 세션이 저장돼 이후엔 무인 자동.
 
 이어서:
 ```bash
-npm run login      # 1) 최초 로그인 1회(창이 뜸, 캡차 있으면 직접 통과) → 세션 저장
-npm run capture    # 2) 실데이터 캡처 1회 → captures/ 의 json 으로 betman.ts 파서 보정
+npm run login      # 1) 크롬 창이 뜸 → 평소처럼 직접 로그인 → 터미널에서 Enter → 세션 저장
+npm run capture    # 2) 배당 1회 캡처 → captures/ 의 json 내용을 개발자에게 전달(파서 보정용)
 npm start          # 3) 무인 자동 실행(12분±). 창 닫으면 멈춤
 ```
 
@@ -51,25 +53,21 @@ pm2 save
 > 앱 쪽 준비(딱 1가지): Vercel 앱 env 에 `ODDS_INGEST_TOKEN`(랜덤 32+바이트) 설정 후 재배포.
 > 앱에 Supabase 가 설정돼 있어야 결과가 영속·실시간 반영된다(Vercel FS 는 임시).
 
-## 처음 한 번: 로그인 시드 + 파서 보정
+## 로그인 동작 방식
 
-베트맨 응답 구조는 사이트에서 직접 확인해야 한다(앱 파서 필드는 초기값이 추정치).
+베트맨 로그인은 자동입력/인증서 등으로 헤드리스 완전자동이 어렵다. 그래서:
+- `npm run login` 이 크롬 창을 띄우고 `betman.co.kr` 메인으로 이동한다.
+- **사용자가 평소처럼 직접 로그인**한 뒤, 터미널에서 **Enter** 를 누른다.
+- 스크립트가 회원 전용 페이지 접근으로 로그인 여부를 확인하고 `betman-session.json`(세션)을 저장한다.
+- 이후 `npm run once`/`npm start` 는 그 세션으로 **무인 자동** 동작한다. 세션이 만료되면 그때만 다시 `npm run login`.
 
-1. **로그인 시드(헤드풀)** — 캡차/2FA 가 있어도 직접 통과:
-   ```bash
-   npm run login        # 브라우저 창이 뜸. 자동 로그인 시도, 실패 시 창에서 직접 로그인
-   ```
-   성공하면 `betman-session.json`(세션 쿠키)이 저장된다.
+이 방식은 로그인 폼 셀렉터 추측에 의존하지 않아 사이트가 바뀌어도 잘 깨지지 않는다.
 
-2. **실데이터 캡처**:
-   ```bash
-   npm run capture      # 승부식 페이지를 열어 gameSlip 응답을 captures/ 에 저장(POST 안 함)
-   ```
-   `captures/gameSlip-*.json` 의 `compSchedules.keys` 배열을 열어 실제 필드명을 확인한다.
-
-3. **앱 파서 보정** — `src/lib/data-sources/betman.ts` 의 `parseBetmanGameSlip` 에서
-   키 이름(`homeName/winAllot/...`), 필터 리터럴(`itemCode==='SC'`, `betTypNm==='승무패'`,
-   `gameName.includes('월드컵')`), `TEAM_ALIASES` 를 캡처 실데이터에 맞게 수정 후 배포.
+### 파서 보정(처음 1회)
+앱 파서 필드는 초기값이 추정치다. `npm run capture` 로 뜬 `captures/gameSlip-*.json` 의
+`compSchedules.keys` 를 실제값으로 확인해 `src/lib/data-sources/betman.ts` 의
+`parseBetmanGameSlip`(키 이름, `itemCode==='SC'`·`betTypNm==='승무패'`·`gameName.includes('월드컵')` 필터,
+`TEAM_ALIASES`)를 보정한다. 캡처 json 내용을 개발자에게 전달하면 맞춰준다.
 
 ### 수동 캡처(브라우저 DevTools) — 대안
 1. 베트맨 로그인 → 프로토 승부식 페이지.
@@ -99,8 +97,8 @@ pm2 save
 - 세션 파일은 본인 기기에만 두고 파일 권한을 제한(`chmod 600`)하길 권장.
 
 ## 트러블슈팅
-- **로그인 입력란 못 찾음 / 로그인 실패**: `.env` 의 `BETMAN_*_SELECTOR` 를 DevTools 로 확인해 지정.
-  캡차/2FA 면 `npm run login` 으로 수동 통과 후 세션 재사용.
-- **gameSlip 캡처 실패**: `BETMAN_PROTO_URL` / `GAMESLIP_URL_MATCH` 를 실제 승부식 XHR 에 맞게 조정.
-- **ingest 422**: 승부식 파싱 0건 → `npm run capture` 로 실데이터를 떠서 앱 `betman.ts` 필드 보정.
-- **세션 만료**: 다음 사이클에 자동 재로그인. 캡차로 막히면 `npm run login` 재시드.
+- **`로그인이 필요한 메뉴입니다` 화면**: 정상 — 아직 로그인 전이다. 창에서 직접 로그인 후 Enter.
+- **세션 없음/만료 에러(`npm start` 시)**: `npm run login` 으로 다시 1회 로그인해 세션을 시드.
+- **배당 캡처 실패**: 로그인 후 `.env 의 BETMAN_PROTO_URL` 이 실제 승부식 배당 페이지인지 확인.
+  `npm run capture` 는 자동 실패 시 직접 그 페이지로 이동 후 Enter 하면 캡처한다.
+- **ingest 422**: 승부식 파싱 0건 → `npm run capture` 의 json 을 개발자에게 전달해 `betman.ts` 보정.
