@@ -62,10 +62,33 @@ for (const it of items) {
   console.log(JSON.stringify(decode(row), null, 1));
 }
 
-// '월드컵' 글자가 어디든 들어간 행 최대 3개(축구 승무패 확인용)
-const wc = datas
-  .filter((r) => r.some((v) => typeof v === 'string' && v.includes('월드컵')))
-  .slice(0, 3);
-console.log('\n===== "월드컵" 포함 행 (최대 3개, 디코딩) =====');
-if (wc.length === 0) console.log('  (월드컵 글자 포함 행 없음 — 리그명이 다른 형태일 수 있음)');
-for (const r of wc) console.log('\n' + JSON.stringify(decode(r), null, 1));
+// ── 파서 미리보기: 앱 betman.ts 와 동일 필터로 "추출될 월드컵 승무패 경기" 출력 ──
+// 필터: itemCode='SC' AND betTypNm='승무패' AND leagueName 에 '월드컵' 포함.
+const c = {
+  item: idx('itemCode'),
+  league: idx('leagueName'),
+  home: idx('homeName'),
+  away: idx('awayName'),
+  win: idx('winAllot'),
+  draw: idx('drawAllot'),
+  lose: idx('loseAllot'),
+  bet: idx('betTypNm'),
+  date: idx('gameDate'),
+};
+const okOdd = (v) => Number.isFinite(Number(v)) && Number(v) > 1 && Number(v) <= 100;
+const extracted = datas.filter(
+  (r) =>
+    r[c.item] === 'SC' &&
+    r[c.bet] === '승무패' &&
+    String(r[c.league] ?? '').includes('월드컵') &&
+    okOdd(r[c.win]) &&
+    okOdd(r[c.draw]) &&
+    okOdd(r[c.lose]),
+);
+console.log(`\n===== 파서가 추출할 월드컵 승무패 경기: ${extracted.length}개 =====`);
+for (const r of extracted) {
+  const d = c.date >= 0 && r[c.date] ? new Date(r[c.date]).toISOString().slice(0, 16) : '';
+  console.log(
+    `  ${r[c.home]} vs ${r[c.away]}  →  승 ${r[c.win]} / 무 ${r[c.draw]} / 패 ${r[c.lose]}  (${d})`,
+  );
+}
