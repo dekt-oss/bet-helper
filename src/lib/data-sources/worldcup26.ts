@@ -162,18 +162,22 @@ function toKickoffIso(local?: string): string {
 }
 
 function parseScorers(raw: string | undefined): string[] {
-  if (!raw || raw === 'null' || raw.trim() === '') return [];
-  return raw
+  if (!raw) return [];
+  // 원본 예: {“J. Quiñones 9'”,”R. Jiménez 67'”} — 중괄호/곡선따옴표 제거(분 표기 ' 는 유지).
+  const cleaned = raw.replace(/[{}“”"]/g, '').trim();
+  if (!cleaned || cleaned.toLowerCase() === 'null') return [];
+  return cleaned
     .split(/[,;]/)
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter((s) => s && s.toLowerCase() !== 'null');
 }
 
 function deriveStatus(g: WcGame): Match['status'] {
-  const t = (g.time_elapsed ?? '').toLowerCase();
-  if (g.finished === 'TRUE' || t === 'ft') return 'FINISHED';
-  if (t === '' || t === 'notstarted') return 'SCHEDULED';
-  if (t === 'ht' || t === 'halftime') return 'PAUSED';
+  const t = (g.time_elapsed ?? '').toLowerCase().trim();
+  if (g.finished === 'TRUE' || ['ft', 'finished', 'fulltime', 'full-time'].includes(t))
+    return 'FINISHED';
+  if (t === '' || t === 'notstarted' || t === 'not started') return 'SCHEDULED';
+  if (['ht', 'halftime', 'half-time'].includes(t)) return 'PAUSED';
   return 'LIVE';
 }
 
