@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>베트맨 배당 수집기 설정</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; max-width: 540px; margin: 24px auto; padding: 0 16px; color: #111; }
+      h1 { font-size: 18px; }
+      ol { padding-left: 18px; color: #444; }
+      label { display: block; margin: 14px 0 4px; font-weight: 600; }
+      input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font: inherit; }
+      .hint { color: #666; font-size: 12px; margin-top: 4px; }
+      button { margin-top: 18px; padding: 10px 16px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; font-weight: 600; cursor: pointer; }
+      #msg { margin-left: 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>베트맨 배당 수집기 설정</h1>
+    <ol>
+      <li>아래 2가지(앱 주소·토큰)를 한 번 입력하고 저장하세요.</li>
+      <li>그다음 <b>베트맨 승부식 페이지를 한 번 열면</b> 배당 요청이 자동 학습됩니다.</li>
+      <li>이후 설정한 주기마다 자동으로 수집됩니다. (F12 불필요)</li>
+    </ol>
+
+    <label for="ingestUrl">앱 ingest URL</label>
+    <input id="ingestUrl" placeholder="https://<내앱>/api/odds/ingest" />
+    <div class="hint">Bet-Helper 앱의 수집 엔드포인트.</div>
+
+    <label for="ingestToken">ingest 토큰</label>
+    <input id="ingestToken" type="password" placeholder="ODDS_INGEST_TOKEN 값" />
+    <div class="hint">앱 환경변수 <code>ODDS_INGEST_TOKEN</code> 과 동일한 값.</div>
+
+    <label for="periodMinutes">수집 주기 (분, 최소 60)</label>
+    <input id="periodMinutes" type="number" min="60" value="360" />
+    <div class="hint">기본 360분(6시간).</div>
+
+    <div><button id="save">저장</button><span id="msg"></span></div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

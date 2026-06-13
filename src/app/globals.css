@@ -76,15 +76,69 @@ nav a:hover {
   gap: 12px;
 }
 
+.match-item {
+  border-bottom: 1px solid var(--border);
+}
+.match-item:last-child {
+  border-bottom: none;
+}
+
 .match-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.12s ease;
 }
-.match-row:last-child {
-  border-bottom: none;
+.match-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.match-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.match-row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  white-space: nowrap;
+  gap: 2px;
+}
+.row-caret {
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+.match-item.open .row-caret {
+  transform: rotate(180deg);
+}
+
+.match-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.match-detail > div {
+  display: contents;
+}
+.match-detail dt {
+  color: var(--muted);
+}
+.match-detail dd {
+  margin: 0;
+}
+.match-detail .odds-chips {
+  margin-top: 0;
 }
 
 .badge {

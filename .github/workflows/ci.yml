@@ -17,4 +17,9 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      - name: Unit tests
+        shell: bash
+        run: |
+          shopt -s globstar
+          node --test --import tsx ./src/**/*.test.ts
       - run: npm run build

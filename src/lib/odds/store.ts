@@ -12,6 +12,8 @@ export interface OddsInput {
   home: number;
   draw: number;
   away: number;
+  /** 배당 출처. 생략 시 'betman'(수동 입력). 자동 배당 스냅샷은 'oddsapi'. */
+  source?: Odds['source'];
 }
 
 // ── 공개 API ──────────────────────────────────────────────
@@ -81,7 +83,7 @@ async function sbUpsertOdds(input: OddsInput): Promise<Odds> {
         home: input.home,
         draw: input.draw,
         away: input.away,
-        source: 'betman',
+        source: input.source ?? 'betman',
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'match_id' },
@@ -118,7 +120,7 @@ async function fileUpsertOdds(input: OddsInput): Promise<Odds> {
     draw: input.draw,
     away: input.away,
     updatedAt: new Date().toISOString(),
-    source: 'betman',
+    source: input.source ?? 'betman',
   };
   const idx = all.findIndex((o) => o.matchId === input.matchId);
   if (idx === -1) all.push(odds);

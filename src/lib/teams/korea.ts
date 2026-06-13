@@ -77,6 +77,11 @@ const KOREAN: Record<string, string> = {
   capeverde: '카보베르데',
   curacao: '퀴라소',
   haiti: '아이티',
+  drcongo: '콩고민주공화국',
+  congodr: '콩고민주공화국',
+  democraticrepublicofthecongo: '콩고민주공화국',
+  bosniaherzegovina: '보스니아헤르체고비나',
+  bosniaandherzegovina: '보스니아헤르체고비나',
 };
 
 function normalize(name: string | null | undefined): string {
@@ -85,6 +90,7 @@ function normalize(name: string | null | undefined): string {
     .replace(/\(.*?\)/g, '')
     .trim()
     .toLowerCase()
+    .replace(/&/g, 'and')
     .replace(/[\s.'’-]/g, '');
 }
 
