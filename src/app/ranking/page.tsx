@@ -3,7 +3,6 @@ import { listOpinions } from '@/lib/opinions/store';
 import {
   computePredictionLeaderboard,
   computePredictionDetails,
-  resultOf,
 } from '@/lib/opinions/leaderboard';
 import { OPINION_MEMBERS, MEMBERS } from '@/lib/pool/config';
 import { AutoRefresh } from '@/components/AutoRefresh';
@@ -27,11 +26,6 @@ export default async function RankingPage() {
     [],
     MEMBERS,
   );
-
-  // 채점된(종료+스코어) 경기 수 — 모수 안내용.
-  const gradedCount = matches.filter(
-    (m) => m.status === 'FINISHED' && resultOf(m) != null,
-  ).length;
 
   const hasAnyRecord = rows.some((r) => r.attempts > 0);
   const leader = hasAnyRecord ? rows[0] : null;
@@ -66,13 +60,6 @@ export default async function RankingPage() {
             {leader
               ? `적중률 ${Math.round(leader.winRate * 100)}% · ${leader.correct}/${leader.attempts}`
               : '기록 없음'}
-          </div>
-        </div>
-        <div className="card">
-          <div className="muted">채점된 경기</div>
-          <div className="stat">{gradedCount}</div>
-          <div className="muted" style={{ fontSize: 12 }}>
-            종료·결과 확정 경기
           </div>
         </div>
         <div className="card">
