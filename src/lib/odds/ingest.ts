@@ -4,6 +4,7 @@
 import { parseBetmanGameSlip, matchOddsToMatches } from '@/lib/data-sources/betman';
 import { getMatches } from '@/lib/data-sources';
 import { upsertOdds } from './store';
+import { recordBetmanHeartbeat } from './status';
 
 export interface IngestResult {
   count: number;
@@ -24,5 +25,7 @@ export async function ingestBetmanRaw(raw: string): Promise<IngestResult> {
   for (const o of matched) {
     await upsertOdds({ matchId: o.matchId, home: o.home, draw: o.draw, away: o.away });
   }
+  // 베트맨 데이터를 성공적으로 받았으므로(파싱>0) 마지막 수집 시각 기록 → 배너 정확도.
+  await recordBetmanHeartbeat();
   return { count: matched.length };
 }
