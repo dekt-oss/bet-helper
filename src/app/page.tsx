@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import { getMatches, getOdds } from '@/lib/data-sources';
 import { listBetsSettled } from '@/lib/bets/store';
+import { listOpinions } from '@/lib/opinions/store';
+import { computePredictionLeaderboard } from '@/lib/opinions/leaderboard';
 import { computePoolBalance } from '@/lib/pool/balance';
+import { OPINION_MEMBERS } from '@/lib/pool/config';
 import { MatchList, type OddsTriple } from '@/components/MatchList';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { OddsHealthBanner } from '@/components/OddsHealthBanner';
@@ -23,13 +26,19 @@ const statusLabel: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const [{ matches, source }, { odds }, heartbeat] = await Promise.all([
+  const [{ matches, source }, { odds }, heartbeat, opinions] = await Promise.all([
     getMatches(),
     getOdds(),
     getBetmanHeartbeat(),
+    listOpinions(),
   ]);
   const bets = await listBetsSettled(matches);
   const pool = computePoolBalance(bets);
+
+  // 예측왕 Top 3 (베팅과 무관한 의견 적중률).
+  const predTop = computePredictionLeaderboard(opinions, matches, OPINION_MEMBERS)
+    .filter((r) => r.attempts > 0)
+    .slice(0, 3);
 
   const oddsByMatch: Record<string, OddsTriple> = {};
   for (const o of odds)
@@ -97,6 +106,37 @@ export default async function DashboardPage() {
           <div className="stat">{(pool.winRate * 100).toFixed(0)}%</div>
         </div>
       </div>
+
+      {predTop.length > 0 && (
+        <>
+          <div className="section-head">
+            <h2>🏆 예측왕 Top 3</h2>
+            <Link href="/ranking">전체 순위 →</Link>
+          </div>
+          <div className="card mini-rank">
+            {predTop.map((r, i) => (
+              <div className="mini-rank-row" key={r.member}>
+                <span className="mini-rank-pos">
+                  {['🥇', '🥈', '🥉'][i]}
+                </span>
+                <span className="mini-rank-name">
+                  {r.member}
+                  {r.streak >= 2 && (
+                    <span className="streak-badge">🔥 {r.streak}</span>
+                  )}
+                </span>
+                <span className="mini-rank-pct">
+                  {Math.round(r.winRate * 100)}%
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {' '}
+                    ({r.correct}/{r.attempts})
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* 베팅내역 (최근) */}
       <div className="section-head">

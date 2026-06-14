@@ -796,6 +796,17 @@ tbody tr:last-child td {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--border);
 }
+.opinion-badge {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 8px;
+  white-space: nowrap;
+  color: var(--text);
+  background: rgba(61, 220, 132, 0.12);
+  border: 1px solid rgba(61, 220, 132, 0.3);
+}
 .bet-line {
   display: flex;
   gap: 10px;
@@ -932,17 +943,21 @@ tbody tr:last-child td {
 }
 .opinion-picks {
   display: flex;
-  gap: 4px;
+  gap: 6px;
+  /* 승/무/패 선택을 코멘트보다 넓게 — 가장 자주 누르는 컨트롤. */
+  flex: 1 1 220px;
 }
 .opinion-pick {
-  padding: 4px 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 6px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  max-width: 110px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -953,8 +968,9 @@ tbody tr:last-child td {
   color: #04210f;
 }
 .opinion-comment {
-  flex: 1;
-  min-width: 120px;
+  /* 코멘트(선택)는 보조 입력이라 폭을 좁게 고정. */
+  flex: 0 1 150px;
+  min-width: 90px;
   padding: 5px 8px;
 }
 .opinion-save {
@@ -965,4 +981,183 @@ tbody tr:last-child td {
   color: var(--text);
   cursor: pointer;
   font-size: 12px;
+}
+
+/* ── 예측 순위 표 ─────────────────────────────────────────── */
+.rank-table td {
+  vertical-align: middle;
+}
+.rank-table tr.top td {
+  background: rgba(61, 220, 132, 0.06);
+}
+.rank-pos {
+  font-size: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.rank-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rank-bar {
+  flex: 1;
+  height: 8px;
+  min-width: 60px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.rank-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+}
+.rank-pct {
+  min-width: 38px;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 경기별 예측 상세 */
+.pred-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.pred-match {
+  padding: 12px 14px;
+}
+.pred-match-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.pred-teams {
+  font-weight: 600;
+}
+.pred-result-chip {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 2px 10px;
+  color: #04210f;
+  background: var(--accent);
+}
+.pred-result-chip.pending {
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+}
+.pred-consensus {
+  font-size: 13px;
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(61, 220, 132, 0.08);
+  border: 1px solid rgba(61, 220, 132, 0.25);
+}
+
+/* 최근 폼(연승) 점 */
+.form-dots {
+  display: flex;
+  gap: 4px;
+}
+.form-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.form-dot.ok {
+  background: var(--accent);
+}
+.form-dot.no {
+  background: var(--live);
+}
+.streak-badge {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffb454;
+  white-space: nowrap;
+}
+
+/* 경기별 예측 필터 */
+.pred-filter {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 12px;
+  flex-wrap: wrap;
+}
+.pred-filter-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.pred-filter-btn.active {
+  border-color: var(--accent);
+  background: rgba(61, 220, 132, 0.12);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 대시보드 미니 순위 */
+.mini-rank {
+  display: grid;
+  gap: 2px;
+}
+.mini-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.mini-rank-row:last-child {
+  border-bottom: none;
+}
+.mini-rank-pos {
+  font-size: 18px;
+  width: 26px;
+  text-align: center;
+}
+.mini-rank-name {
+  font-weight: 600;
+  flex: 1;
+}
+.mini-rank-pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pred-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pred-pick {
+  font-size: 13px;
+  border-radius: 8px;
+  padding: 4px 10px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.pred-pick.ok {
+  border-color: rgba(61, 220, 132, 0.5);
+  background: rgba(61, 220, 132, 0.12);
+}
+.pred-pick.no {
+  border-color: rgba(255, 77, 79, 0.45);
+  background: rgba(255, 77, 79, 0.1);
 }
