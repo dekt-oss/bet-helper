@@ -1063,6 +1063,83 @@ tbody tr:last-child td {
   background: rgba(61, 220, 132, 0.08);
   border: 1px solid rgba(61, 220, 132, 0.25);
 }
+
+/* 최근 폼(연승) 점 */
+.form-dots {
+  display: flex;
+  gap: 4px;
+}
+.form-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.form-dot.ok {
+  background: var(--accent);
+}
+.form-dot.no {
+  background: var(--live);
+}
+.streak-badge {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffb454;
+  white-space: nowrap;
+}
+
+/* 경기별 예측 필터 */
+.pred-filter {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 12px;
+  flex-wrap: wrap;
+}
+.pred-filter-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.pred-filter-btn.active {
+  border-color: var(--accent);
+  background: rgba(61, 220, 132, 0.12);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 대시보드 미니 순위 */
+.mini-rank {
+  display: grid;
+  gap: 2px;
+}
+.mini-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.mini-rank-row:last-child {
+  border-bottom: none;
+}
+.mini-rank-pos {
+  font-size: 18px;
+  width: 26px;
+  text-align: center;
+}
+.mini-rank-name {
+  font-weight: 600;
+  flex: 1;
+}
+.mini-rank-pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .pred-picks {
   display: flex;
   flex-wrap: wrap;

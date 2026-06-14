@@ -1,38 +1,17 @@
 import { getMatches } from '@/lib/data-sources';
-import { listOpinions, groupByMatch } from '@/lib/opinions/store';
+import { listOpinions } from '@/lib/opinions/store';
 import {
   computePredictionLeaderboard,
   computePredictionDetails,
   resultOf,
 } from '@/lib/opinions/leaderboard';
-import { consensus } from '@/lib/opinions/consensus';
 import { OPINION_MEMBERS, MEMBERS } from '@/lib/pool/config';
-import { toKoreanTeam } from '@/lib/teams/korea';
 import { AutoRefresh } from '@/components/AutoRefresh';
-import type { Outcome } from '@/lib/types';
+import { PredictionDetails } from '@/components/PredictionDetails';
 
 export const dynamic = 'force-dynamic';
 
 const medal = ['🥇', '🥈', '🥉'];
-const pickLabel: Record<Outcome, string> = { HOME: '승', DRAW: '무', AWAY: '패' };
-const statusText: Record<string, string> = {
-  SCHEDULED: '예정',
-  LIVE: '진행중',
-  PAUSED: '하프타임',
-  FINISHED: '종료',
-  POSTPONED: '연기',
-  CANCELLED: '취소',
-};
-
-function formatKickoff(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'numeric',
-    day: 'numeric',
-    timeZone: 'Asia/Seoul',
-  }).format(d);
-}
 
 export default async function RankingPage() {
   const [{ matches }, opinions] = await Promise.all([
@@ -41,8 +20,13 @@ export default async function RankingPage() {
   ]);
 
   const rows = computePredictionLeaderboard(opinions, matches, OPINION_MEMBERS);
-  const details = computePredictionDetails(opinions, matches, OPINION_MEMBERS);
-  const opinionsByMatch = groupByMatch(opinions);
+  const details = computePredictionDetails(
+    opinions,
+    matches,
+    OPINION_MEMBERS,
+    [],
+    MEMBERS,
+  );
 
   // 채점된(종료+스코어) 경기 수 — 모수 안내용.
   const gradedCount = matches.filter(
@@ -105,7 +89,7 @@ export default async function RankingPage() {
         <table className="standings-table rank-table">
           <thead>
             <tr>
-              <th style={{ width: 28 }}>#</th>
+              <th style={{ width: 34 }}>#</th>
               <th>플레이어</th>
               <th title="예측한 채점 경기수" style={{ textAlign: 'center' }}>
                 참여
@@ -113,23 +97,54 @@ export default async function RankingPage() {
               <th title="적중 수" style={{ textAlign: 'center' }}>
                 적중
               </th>
-              <th style={{ width: '40%' }}>적중률</th>
+              <th title="최근 5경기(최신이 오른쪽)" style={{ textAlign: 'center' }}>
+                최근
+              </th>
+              <th style={{ width: '32%' }}>적중률</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => {
+            {rows.map((r) => {
               const ranked = r.attempts > 0;
               const pct = Math.round(r.winRate * 100);
+              const tied =
+                r.rank != null &&
+                rows.filter((x) => x.rank === r.rank).length > 1;
               return (
-                <tr key={r.member} className={ranked && i < 3 ? 'qualify' : ''}>
-                  <td className="muted rank-pos">{ranked ? i + 1 : '—'}</td>
+                <tr
+                  key={r.member}
+                  className={r.rank != null && r.rank <= 3 ? 'qualify' : ''}
+                >
+                  <td className="muted rank-pos">
+                    {r.rank != null
+                      ? `${tied ? '=' : ''}${r.rank}`
+                      : '—'}
+                  </td>
                   <td className="team">
                     {r.member}
-                    {ranked && i < 3 ? ` ${medal[i]}` : ''}
+                    {r.rank != null && r.rank <= 3 ? ` ${medal[r.rank - 1]}` : ''}
+                    {r.streak >= 2 && (
+                      <span className="streak-badge">🔥 {r.streak}연속</span>
+                    )}
                   </td>
                   <td style={{ textAlign: 'center' }}>{r.attempts}</td>
                   <td style={{ textAlign: 'center' }}>
                     <strong>{r.correct}</strong>
+                  </td>
+                  <td>
+                    {ranked ? (
+                      <div className="form-dots">
+                        {r.form.map((ok, i) => (
+                          <span
+                            key={i}
+                            className={`form-dot ${ok ? 'ok' : 'no'}`}
+                            title={ok ? '적중' : '빗나감'}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
                   </td>
                   <td>
                     {ranked ? (
@@ -153,7 +168,7 @@ export default async function RankingPage() {
         </table>
       </div>
 
-      {/* 경기별 예측 상세 */}
+      {/* 경기별 예측 상세 (필터 가능) */}
       {details.length > 0 && (
         <>
           <h2>경기별 예측</h2>
@@ -161,70 +176,7 @@ export default async function RankingPage() {
             누가 무엇을 예상했는지와 실제 결과입니다. (✅ 적중 · ❌ 빗나감 · 결과
             전 경기는 표시 없음)
           </p>
-          <div className="pred-list">
-            {details.map((d) => {
-              const home = toKoreanTeam(d.homeName);
-              const away = toKoreanTeam(d.awayName);
-              const con = consensus(opinionsByMatch[d.matchId] ?? [], MEMBERS);
-              const conCorrect =
-                con.agreed && d.result != null ? con.pick === d.result : null;
-              return (
-                <div className="pred-match card" key={d.matchId}>
-                  <div className="pred-match-head">
-                    <span className="pred-teams">
-                      {home} <span className="muted">vs</span> {away}
-                      <span className="muted" style={{ fontSize: 12 }}>
-                        {' '}
-                        · {formatKickoff(d.kickoff)} ·{' '}
-                        {statusText[d.status] ?? d.status}
-                      </span>
-                    </span>
-                    {d.result && d.score ? (
-                      <span className="pred-result-chip">
-                        결과 {d.score.home}:{d.score.away} ·{' '}
-                        {pickLabel[d.result]}
-                      </span>
-                    ) : (
-                      <span className="pred-result-chip pending">결과 대기</span>
-                    )}
-                  </div>
-
-                  {con.agreed && (
-                    <div className="pred-consensus">
-                      🤝 3인 합의: <b>{pickLabel[con.pick!]}</b>
-                      {conCorrect === true
-                        ? ' · ✅ 합의 적중'
-                        : conCorrect === false
-                          ? ' · ❌ 합의 빗나감'
-                          : ''}
-                    </div>
-                  )}
-
-                  <div className="pred-picks">
-                    {d.picks.map((p) => (
-                      <span
-                        key={p.member}
-                        className={`pred-pick ${
-                          p.correct === true
-                            ? 'ok'
-                            : p.correct === false
-                              ? 'no'
-                              : ''
-                        }`}
-                      >
-                        {p.member} <b>{pickLabel[p.pick]}</b>
-                        {p.correct === true
-                          ? ' ✅'
-                          : p.correct === false
-                            ? ' ❌'
-                            : ''}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <PredictionDetails details={details} />
         </>
       )}
 

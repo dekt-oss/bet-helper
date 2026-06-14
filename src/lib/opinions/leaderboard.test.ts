@@ -14,11 +14,17 @@ function op(matchId: string, member: string, pick: Outcome | ''): Opinion {
   return { matchId, member, pick, updatedAt: '2026-06-13T00:00:00Z' };
 }
 
-function match(id: string, home: number, away: number, finished = true): Match {
+function match(
+  id: string,
+  home: number,
+  away: number,
+  finished = true,
+  kickoff = '2026-06-13T00:00:00Z',
+): Match {
   return {
     id,
     competition: 'FIFA World Cup 2026',
-    kickoff: '2026-06-13T00:00:00Z',
+    kickoff,
     status: finished ? 'FINISHED' : 'SCHEDULED',
     home: { id: 'h', name: 'Home' },
     away: { id: 'a', name: 'Away' },
@@ -71,6 +77,55 @@ test('참고인 플래그 표시', () => {
   const rows = computePredictionLeaderboard([], [], [...MEMBERS, ...ADVISORY], ADVISORY);
   assert.equal(rows.find((r) => r.member === '김민석')!.advisory, true);
   assert.equal(rows.find((r) => r.member === '임준혁')!.advisory, false);
+});
+
+test('폼/연승: 최신순 연속 적중 + 공동 순위', () => {
+  // m1(이른) HOME, m2(늦은) AWAY 결과.
+  const matches = [
+    match('m1', 1, 0, true, '2026-06-11T00:00:00Z'),
+    match('m2', 0, 1, true, '2026-06-12T00:00:00Z'),
+  ];
+  const opinions = [
+    op('m1', '임준혁', 'HOME'), // 적중
+    op('m2', '임준혁', 'AWAY'), // 적중 → 2연승
+    op('m1', '양준환', 'HOME'), // 적중
+    op('m2', '양준환', 'HOME'), // 실패 → streak 0
+  ];
+  const rows = computePredictionLeaderboard(opinions, matches, MEMBERS);
+  const im = rows.find((r) => r.member === '임준혁')!;
+  const yang = rows.find((r) => r.member === '양준환')!;
+  assert.deepEqual(im.form, [true, true]); // 오래된→최신
+  assert.equal(im.streak, 2);
+  assert.deepEqual(yang.form, [true, false]);
+  assert.equal(yang.streak, 0);
+  assert.equal(im.rank, 1);
+  assert.equal(yang.rank, 2);
+});
+
+test('공동 순위: 적중률 같으면 동일 등수', () => {
+  const matches = [match('m1', 1, 0)];
+  const opinions = [
+    op('m1', '임준혁', 'HOME'), // 적중 100%
+    op('m1', '양준환', 'HOME'), // 적중 100%
+  ];
+  const rows = computePredictionLeaderboard(opinions, matches, MEMBERS);
+  const im = rows.find((r) => r.member === '임준혁')!;
+  const yang = rows.find((r) => r.member === '양준환')!;
+  assert.equal(im.rank, 1);
+  assert.equal(yang.rank, 1); // 공동 1위
+  assert.equal(rows.find((r) => r.member === '전인우')!.rank, null);
+});
+
+test('경기별 예측 상세: 합의 + 합의 적중 여부', () => {
+  const matches = [match('m1', 2, 0)]; // HOME
+  const opinions = [
+    op('m1', '임준혁', 'HOME'),
+    op('m1', '양준환', 'HOME'),
+    op('m1', '전인우', 'HOME'),
+  ];
+  const details = computePredictionDetails(opinions, matches, MEMBERS, [], MEMBERS);
+  assert.equal(details[0].consensusPick, 'HOME');
+  assert.equal(details[0].consensusCorrect, true);
 });
 
 test('경기별 예측 상세: 결과 있는 경기 먼저 + 적중 표시', () => {
