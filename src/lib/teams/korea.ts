@@ -158,3 +158,22 @@ export function koreanGroupName(stage: string | undefined | null): string {
 export function teamCanon(name: string | null | undefined): string {
   return toKoreanTeam(name);
 }
+
+/**
+ * 데이터 소스가 바뀌어도 같은 경기면 같은 값을 주는 "안정적 경기 ID".
+ * - 팀명을 표준화(teamCanon)해 만들므로 worldcup26/openfootball/football-data 가
+ *   서로 달라도 동일 ID 가 된다 → 저장한 의견·배당이 소스 전환에도 유지된다.
+ * - 팀을 식별하지 못하면(미정/빈값) null 을 반환 → 호출부가 소스 고유 ID 로 폴백.
+ *   (미정 경기끼리 같은 ID 로 합쳐지는 것을 방지)
+ */
+export function stableMatchId(
+  home: string | null | undefined,
+  away: string | null | undefined,
+): string | null {
+  const a = teamCanon(home);
+  const b = teamCanon(away);
+  if (!a || !b || a === '미정' || b === '미정') return null;
+  const slug = (s: string) => s.replace(/[\s.'’\-]/g, '').toLowerCase();
+  return `wc-${[slug(a), slug(b)].sort().join('--')}`;
+}
+

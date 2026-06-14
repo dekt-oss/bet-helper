@@ -9,6 +9,7 @@
 import type { Match, Team } from '@/lib/types';
 import { unstable_cache } from 'next/cache';
 import { fetchWithTimeout } from '@/lib/http';
+import { stableMatchId } from '@/lib/teams/korea';
 
 const BASE = process.env.WORLDCUP26_BASE_URL ?? 'https://worldcup26.ir';
 // 공개 월드컵 데이터라 민감하지 않다. 환경변수로 덮어쓸 수 있게 둔다.
@@ -296,7 +297,9 @@ function gameToMatch(g: WcGame, venues: Map<string, VenueInfo>): Match {
   const hasScorers = homeScorers.length > 0 || awayScorers.length > 0;
   const venue = g.stadium_id ? venues.get(g.stadium_id) : undefined;
   return {
-    id: `wc2026-${g.id}`,
+    id:
+      stableMatchId(g.home_team_name_en, g.away_team_name_en) ??
+      `wc2026-${g.id}`,
     competition: 'FIFA World Cup 2026',
     stage: mapStage(g.group, g.type),
     // 개최지별 시간대로 환산(없으면 기본 -360).

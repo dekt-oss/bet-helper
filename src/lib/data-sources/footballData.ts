@@ -4,6 +4,7 @@
 
 import type { Match, MatchStatus, Team } from '@/lib/types';
 import { fetchWithTimeout } from '@/lib/http';
+import { stableMatchId } from '@/lib/teams/korea';
 
 const BASE = 'https://api.football-data.org/v4';
 // World Cup 대회 코드 (football-data.org 기준 'WC'). 필요 시 조정.
@@ -80,7 +81,7 @@ export async function fetchLiveWorldCupMatches(): Promise<Match[]> {
   const data = (await res.json()) as { matches: FDMatch[] };
 
   return data.matches.map((m) => ({
-    id: `fd-${m.id}`,
+    id: stableMatchId(m.homeTeam?.name, m.awayTeam?.name) ?? `fd-${m.id}`,
     competition: m.competition.name,
     stage: m.group ?? m.stage,
     kickoff: m.utcDate,

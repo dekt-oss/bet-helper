@@ -4,6 +4,7 @@
 
 import type { Match, Team } from '@/lib/types';
 import { fetchWithTimeout } from '@/lib/http';
+import { stableMatchId } from '@/lib/teams/korea';
 
 const WORLDCUP_2026_URL =
   'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
@@ -67,7 +68,9 @@ export async function fetchWorldCupFixtures(): Promise<Match[]> {
     if (!kickoff) continue;
     const ft = m.score?.ft;
     out.push({
-      id: `wc2026-${m.num ?? `${m.date}-${m.team1.name}-${m.team2.name}`}`,
+      id:
+        stableMatchId(m.team1.name, m.team2.name) ??
+        `wc2026-${m.num ?? `${m.date}-${m.team1.name}-${m.team2.name}`}`,
       competition: data.name ?? 'FIFA World Cup 2026',
       stage: m.group ?? round,
       kickoff,
