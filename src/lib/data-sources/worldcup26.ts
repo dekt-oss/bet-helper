@@ -8,6 +8,7 @@
 
 import type { Match, Team } from '@/lib/types';
 import { unstable_cache } from 'next/cache';
+import { fetchWithTimeout } from '@/lib/http';
 
 const BASE = process.env.WORLDCUP26_BASE_URL ?? 'https://worldcup26.ir';
 // 공개 월드컵 데이터라 민감하지 않다. 환경변수로 덮어쓸 수 있게 둔다.
@@ -52,7 +53,7 @@ async function rawPost(
 ): Promise<Response> {
   // no-store 를 쓰지 않는다(POST 는 어차피 캐시 안 됨). unstable_cache 안에서 호출돼도
   // 충돌하지 않도록 기본 캐시 모드로 둔다.
-  return fetch(`${BASE}${path}`, {
+  return fetchWithTimeout(`${BASE}${path}`, {
     method: 'POST',
     headers: { ...COMMON_HEADERS, 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -108,7 +109,7 @@ async function getToken(): Promise<string | null> {
 async function apiGet<T>(path: string, revalidate: number): Promise<T> {
   const token = await getToken();
   if (!token) throw new Error('worldcup26: 인증 토큰을 받지 못했습니다');
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetchWithTimeout(`${BASE}${path}`, {
     headers: { ...COMMON_HEADERS, authorization: `Bearer ${token}` },
     next: { revalidate },
   });
@@ -120,7 +121,7 @@ async function apiGet<T>(path: string, revalidate: number): Promise<T> {
     } catch {
       throw new Error('worldcup26: 재인증 실패');
     }
-    const retry = await fetch(`${BASE}${path}`, {
+    const retry = await fetchWithTimeout(`${BASE}${path}`, {
       headers: { authorization: `Bearer ${fresh}` },
       next: { revalidate },
     });

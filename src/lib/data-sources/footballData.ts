@@ -3,6 +3,7 @@
 // 월드컵 대회코드는 시즌마다 다를 수 있어 환경변수/상수로 관리.
 
 import type { Match, MatchStatus, Team } from '@/lib/types';
+import { fetchWithTimeout } from '@/lib/http';
 
 const BASE = 'https://api.football-data.org/v4';
 // World Cup 대회 코드 (football-data.org 기준 'WC'). 필요 시 조정.
@@ -65,11 +66,14 @@ export async function fetchLiveWorldCupMatches(): Promise<Match[]> {
   const key = process.env.FOOTBALL_DATA_API_KEY;
   if (!key) throw new Error('FOOTBALL_DATA_API_KEY 가 설정되지 않았습니다.');
 
-  const res = await fetch(`${BASE}/competitions/${WORLD_CUP_CODE}/matches`, {
-    headers: { 'X-Auth-Token': key },
-    // 실시간성이 중요하므로 짧게 캐시
-    next: { revalidate: 30 },
-  });
+  const res = await fetchWithTimeout(
+    `${BASE}/competitions/${WORLD_CUP_CODE}/matches`,
+    {
+      headers: { 'X-Auth-Token': key },
+      // 실시간성이 중요하므로 짧게 캐시
+      next: { revalidate: 30 },
+    },
+  );
   if (!res.ok) {
     throw new Error(`football-data fetch 실패: ${res.status}`);
   }

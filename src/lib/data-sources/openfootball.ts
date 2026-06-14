@@ -3,6 +3,7 @@
 // https://github.com/openfootball/worldcup.json
 
 import type { Match, Team } from '@/lib/types';
+import { fetchWithTimeout } from '@/lib/http';
 
 const WORLDCUP_2026_URL =
   'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
@@ -40,7 +41,7 @@ function toKickoffIso(date: string, time?: string): string | null {
 }
 
 export async function fetchWorldCupFixtures(): Promise<Match[]> {
-  const res = await fetch(WORLDCUP_2026_URL, {
+  const res = await fetchWithTimeout(WORLDCUP_2026_URL, {
     // 일정 데이터는 자주 안 바뀌므로 1시간 캐시
     next: { revalidate: 3600 },
   });
