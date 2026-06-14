@@ -34,6 +34,21 @@ export default function GlobalError({
           <p style={{ color: '#9aa3b2' }}>
             잠시 후 다시 시도해 주세요. 문제가 계속되면 새로고침해 주세요.
           </p>
+          {(error?.message || error?.digest) && (
+            <pre
+              style={{
+                fontSize: 11,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-all',
+                color: '#9aa3b2',
+                textAlign: 'left',
+                marginTop: 12,
+              }}
+            >
+              {error.message}
+              {error.digest ? `\n(${error.digest})` : ''}
+            </pre>
+          )}
           <button
             type="button"
             onClick={() => reset()}
