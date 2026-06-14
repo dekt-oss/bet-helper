@@ -27,24 +27,68 @@ import { listOdds, upsertOdds } from '@/lib/odds/store';
 
 /**
  * 경기 목록을 가져온다.
- * - football-data 키가 있으면 실시간 상태/스코어가 포함된 데이터를 우선 사용.
- * - 키가 없거나 실패하면 openfootball 정적 일정으로 폴백.
+ *
+ * 안정성 우선 전략(불안정성 해결):
+ * - "기준 데이터"(경기 목록·팀명·ID)는 항상 openfootball(공개·무인증)에서 가져온다.
+ *   → 소스가 깜빡여도 ID·팀명이 바뀌지 않아, 저장한 의견·배당이 사라지지 않는다.
+ * - worldcup26(JWT 인증, 간헐 실패)은 "라이브 정보"(상태·스코어·진행시간·득점자·경기장)
+ *   만 stableMatchId 로 매칭해 덧입힌다. 실패하면 라이브 정보만 빠지고 목록은 유지된다.
+ * - openfootball 이 비어 있을 때만(데이터 공백 방지) worldcup26/football-data 로 폴백.
  */
 // React cache(): 한 번의 요청(렌더) 안에서 중복 호출을 메모이즈한다.
-// (페이지가 getMatches() 와 getOdds()[내부에서 다시 getMatches()]를 호출 → 캐시로 1회만 실행)
 export const getMatches = cache(_getMatches);
+
+// worldcup26 라이브 필드를 openfootball 기준 경기에 덧입힌다(ID·팀명은 기준 유지).
+function mergeLive(base: Match[], live: Match[]): Match[] {
+  const liveById = new Map(live.map((m) => [m.id, m]));
+  return base.map((m) => {
+    const lv = liveById.get(m.id);
+    if (!lv) return m; // 매칭 안 되면 기준 그대로(라이브 정보만 없음)
+    return {
+      ...m,
+      status: lv.status,
+      score: lv.score ?? m.score,
+      minute: lv.minute,
+      scorers: lv.scorers ?? m.scorers,
+      venue: lv.venue ?? m.venue,
+    };
+  });
+}
 
 async function _getMatches(): Promise<{
   matches: Match[];
   source: string;
 }> {
-  // 1순위: worldcup26.ir — 진행시간/득점자/경기장 등 상세 데이터 포함.
+  // 기준: openfootball(안정적). 실패하면 base 는 빈 배열.
+  let base: Match[] = [];
+  try {
+    base = await fetchWorldCupFixtures();
+  } catch (err) {
+    console.warn('[data] openfootball 실패:', err);
+  }
+
+  if (base.length > 0) {
+    // 라이브 보강(worldcup26). 실패해도 기준 목록은 그대로 둔다.
+    if (isWorldcup26Enabled()) {
+      try {
+        const live = await fetchWorldcup26Matches();
+        if (live.length > 0) {
+          return { matches: mergeLive(base, live), source: 'openfootball+worldcup26' };
+        }
+      } catch (err) {
+        console.warn('[data] worldcup26 라이브 보강 실패(무시):', err);
+      }
+    }
+    return { matches: base, source: 'openfootball' };
+  }
+
+  // openfootball 이 비었을 때만 폴백(데이터 공백 방지).
   if (isWorldcup26Enabled()) {
     try {
       const matches = await fetchWorldcup26Matches();
       if (matches.length > 0) return { matches, source: 'worldcup26' };
     } catch (err) {
-      console.warn('[data] worldcup26 실패, 다른 소스로 폴백:', err);
+      console.warn('[data] worldcup26 폴백 실패:', err);
     }
   }
   if (isFootballDataConfigured()) {
@@ -52,17 +96,10 @@ async function _getMatches(): Promise<{
       const matches = await fetchLiveWorldCupMatches();
       if (matches.length > 0) return { matches, source: 'football-data' };
     } catch (err) {
-      console.warn('[data] football-data 실패, openfootball 로 폴백:', err);
+      console.warn('[data] football-data 폴백 실패:', err);
     }
   }
-  try {
-    const matches = await fetchWorldCupFixtures();
-    return { matches, source: 'openfootball' };
-  } catch (err) {
-    // 외부 데이터 소스가 모두 실패해도 페이지는 떠야 한다.
-    console.error('[data] openfootball 실패 → 빈 목록 반환:', err);
-    return { matches: [], source: 'none' };
-  }
+  return { matches: [], source: 'none' };
 }
 
 /** 진행중 경기만 추려서 반환. */
