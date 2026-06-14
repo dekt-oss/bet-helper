@@ -4,6 +4,7 @@ import { listBetsSettled } from '@/lib/bets/store';
 import { computePoolBalance } from '@/lib/pool/balance';
 import { MatchList, type OddsTriple } from '@/components/MatchList';
 import { AutoRefresh } from '@/components/AutoRefresh';
+import { OddsHealthBanner } from '@/components/OddsHealthBanner';
 import { sortKoreaFirst, isKoreaMatch, toKoreanTeam } from '@/lib/teams/korea';
 
 export const dynamic = 'force-dynamic';
@@ -68,6 +69,8 @@ export default async function DashboardPage() {
       <p className="muted">
         경기 데이터 출처: <strong>{source}</strong> · 공동자금 현황
       </p>
+
+      <OddsHealthBanner odds={odds} />
 
       <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <div className="card">
