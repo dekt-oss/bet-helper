@@ -10,12 +10,14 @@ const NEAR_INTERVAL_MIN = 90;
 const BASE_INTERVAL_MIN = 120;
 const NEAR_WINDOW_HOURS = 12;
 
+// 오전/오후 형식: "6.14 오후 12:09"
 function fmtKst(ms: number): string {
   return new Intl.DateTimeFormat('ko-KR', {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: true,
     timeZone: 'Asia/Seoul',
   }).format(ms);
 }
@@ -25,13 +27,6 @@ function agoText(min: number): string {
   if (min < 60) return `${min}분 전`;
   const h = Math.floor(min / 60);
   return `${h}시간 ${min % 60}분 전`;
-}
-
-function afterText(min: number): string {
-  if (min <= 0) return '잠시 후';
-  if (min < 60) return `${min}분 후`;
-  const h = Math.floor(min / 60);
-  return `${h}시간 ${min % 60}분 후`;
 }
 
 /** 가장 가까운 예정/진행 경기까지의 시간으로 다음 수집 간격(분)을 추정. */
@@ -66,10 +61,14 @@ export function OddsHealthBanner({
   const minAgo = Math.round((Date.now() - lastMs) / 60_000);
   const stale = minAgo > STALE_MIN;
 
+  // 다음 갱신 예정: 마지막 갱신 + 주기. 이미 지났으면 다음 '미래' 주기로 투영
+  // (lastUpdate+interval 이 과거가 되어 지난 시각이 뜨던 문제 방지).
   const intervalMin = expectedIntervalMin(matches);
-  const nextMs = lastMs + intervalMin * 60_000;
-  const minToNext = Math.round((nextMs - Date.now()) / 60_000);
-  const nextText = `${afterText(minToNext)} (${fmtKst(nextMs)})`;
+  const sinceMin = (Date.now() - lastMs) / 60_000;
+  const cycles = Math.max(1, Math.ceil(sinceMin / intervalMin));
+  const nextMs = lastMs + cycles * intervalMin * 60_000;
+  const minToNext = Math.max(0, Math.round((nextMs - Date.now()) / 60_000));
+  const nextText = `${fmtKst(nextMs)} (${minToNext}분 후)`;
 
   const base: React.CSSProperties = {
     borderRadius: 10,
