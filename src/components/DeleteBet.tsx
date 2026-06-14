@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
 import { deleteBetAction, type ActionState } from '@/lib/bets/actions';
 
@@ -28,6 +30,10 @@ function DeleteButton() {
 /** 베팅 한 건 삭제 버튼. */
 export function DeleteBet({ id }: { id: string }) {
   const [state, formAction] = useFormState(deleteBetAction, initial);
+  const router = useRouter();
+  useEffect(() => {
+    if (state.ok) router.refresh();
+  }, [state.ok, router]);
   return (
     <form action={formAction} className="inline">
       <input type="hidden" name="id" value={id} />

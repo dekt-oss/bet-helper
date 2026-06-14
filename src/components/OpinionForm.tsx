@@ -1,15 +1,42 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
 import {
   upsertOpinionAction,
-  deleteOpinionSimple,
+  deleteOpinionFormAction,
   type OpinionState,
 } from '@/lib/opinions/actions';
 import type { Opinion, Outcome } from '@/lib/types';
 
 const initial: OpinionState = { ok: false };
+
+// 의견 삭제 버튼(진행중 표시 + 완료 시 화면 자동 갱신).
+function DelBtn() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className="opinion-del" disabled={pending} title="의견 삭제">
+      {pending ? '삭제중…' : '🗑'}
+    </button>
+  );
+}
+
+function OpinionDelete({ matchId, member }: { matchId: string; member: string }) {
+  const [state, action] = useFormState(deleteOpinionFormAction, initial);
+  const router = useRouter();
+  useEffect(() => {
+    if (state.ok) router.refresh();
+  }, [state.ok, router]);
+  return (
+    <form action={action} className="inline">
+      <input type="hidden" name="matchId" value={matchId} />
+      <input type="hidden" name="member" value={member} />
+      <DelBtn />
+      {state.error && <span className="error">⚠</span>}
+    </form>
+  );
+}
 
 function SaveBtn() {
   const { pending } = useFormStatus();
@@ -88,13 +115,7 @@ export function OpinionForm({
         <SaveStatus ok={state.ok} error={state.error} />
       </form>
       {(current?.pick || current?.comment) && (
-        <form action={deleteOpinionSimple}>
-          <input type="hidden" name="matchId" value={matchId} />
-          <input type="hidden" name="member" value={member} />
-          <button type="submit" className="opinion-del" title="의견 삭제">
-            🗑
-          </button>
-        </form>
+        <OpinionDelete matchId={matchId} member={member} />
       )}
     </div>
   );

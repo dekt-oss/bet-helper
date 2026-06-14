@@ -39,15 +39,20 @@ export async function upsertOpinionAction(
   return { ok: true };
 }
 
-/** 폼 버튼에서 바로 쓰는 삭제 액션(FormData 전용). */
-export async function deleteOpinionSimple(formData: FormData): Promise<void> {
+/** useFormState 용 삭제 액션 — 진행/완료 상태를 돌려줘 버튼에 '삭제중…' 표시 가능. */
+export async function deleteOpinionFormAction(
+  _prev: OpinionState,
+  formData: FormData,
+): Promise<OpinionState> {
   const matchId = String(formData.get('matchId') ?? '').trim();
   const member = String(formData.get('member') ?? '').trim();
-  if (!matchId || !member) return;
+  if (!matchId || !member) return { ok: false, error: '경기/멤버 정보가 없습니다.' };
   try {
     await deleteOpinion(matchId, member);
   } catch (err) {
     console.error('[action] deleteOpinion 실패:', err);
+    return { ok: false, error: '삭제 실패: Supabase 설정을 확인하세요.' };
   }
   revalidatePath('/fixtures');
+  return { ok: true };
 }
