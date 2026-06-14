@@ -1055,6 +1055,14 @@ tbody tr:last-child td {
   background: var(--surface-soft);
   border: 1px solid var(--border);
 }
+.pred-consensus {
+  font-size: 13px;
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(61, 220, 132, 0.08);
+  border: 1px solid rgba(61, 220, 132, 0.25);
+}
 .pred-picks {
   display: flex;
   flex-wrap: wrap;

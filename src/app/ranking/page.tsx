@@ -1,11 +1,12 @@
 import { getMatches } from '@/lib/data-sources';
-import { listOpinions } from '@/lib/opinions/store';
+import { listOpinions, groupByMatch } from '@/lib/opinions/store';
 import {
   computePredictionLeaderboard,
   computePredictionDetails,
   resultOf,
 } from '@/lib/opinions/leaderboard';
-import { OPINION_MEMBERS, MEMBERS, ADVISORY_MEMBERS } from '@/lib/pool/config';
+import { consensus } from '@/lib/opinions/consensus';
+import { OPINION_MEMBERS, MEMBERS } from '@/lib/pool/config';
 import { toKoreanTeam } from '@/lib/teams/korea';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import type { Outcome } from '@/lib/types';
@@ -14,6 +15,14 @@ export const dynamic = 'force-dynamic';
 
 const medal = ['🥇', '🥈', '🥉'];
 const pickLabel: Record<Outcome, string> = { HOME: '승', DRAW: '무', AWAY: '패' };
+const statusText: Record<string, string> = {
+  SCHEDULED: '예정',
+  LIVE: '진행중',
+  PAUSED: '하프타임',
+  FINISHED: '종료',
+  POSTPONED: '연기',
+  CANCELLED: '취소',
+};
 
 function formatKickoff(iso: string): string {
   const d = new Date(iso);
@@ -31,19 +40,9 @@ export default async function RankingPage() {
     listOpinions(),
   ]);
 
-  const rows = computePredictionLeaderboard(
-    opinions,
-    matches,
-    OPINION_MEMBERS,
-    ADVISORY_MEMBERS,
-  );
-
-  const details = computePredictionDetails(
-    opinions,
-    matches,
-    OPINION_MEMBERS,
-    ADVISORY_MEMBERS,
-  );
+  const rows = computePredictionLeaderboard(opinions, matches, OPINION_MEMBERS);
+  const details = computePredictionDetails(opinions, matches, OPINION_MEMBERS);
+  const opinionsByMatch = groupByMatch(opinions);
 
   // 채점된(종료+스코어) 경기 수 — 모수 안내용.
   const gradedCount = matches.filter(
@@ -51,6 +50,7 @@ export default async function RankingPage() {
   ).length;
 
   const hasAnyRecord = rows.some((r) => r.attempts > 0);
+  const leader = hasAnyRecord ? rows[0] : null;
 
   return (
     <>
@@ -68,77 +68,92 @@ export default async function RankingPage() {
       </div>
       <p className="muted">
         베팅(돈)과 무관하게, 각자 낸 경기 의견(승/무/패)이 실제 결과와 맞은
-        비율로 겨루는 <strong>예측왕 대결</strong>입니다. · 채점된 경기{' '}
-        {gradedCount}개
+        비율로 겨루는 <strong>예측왕 대결</strong>입니다.
       </p>
 
-      {!hasAnyRecord ? (
-        <p className="muted" style={{ marginTop: 20 }}>
-          아직 채점할 기록이 없습니다. 경기가 종료되면 입력한 의견의 적중률이
-          집계됩니다.
-        </p>
-      ) : (
-        <div className="card table-wrap" style={{ marginTop: 16 }}>
-          <table className="rank-table">
-            <thead>
-              <tr>
-                <th style={{ width: 48 }}>순위</th>
-                <th>이름</th>
-                <th style={{ textAlign: 'right' }}>적중/시도</th>
-                <th style={{ width: '38%' }}>적중률</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const ranked = r.attempts > 0;
-                const pct = Math.round(r.winRate * 100);
-                return (
-                  <tr key={r.member} className={ranked && i < 3 ? 'top' : ''}>
-                    <td className="rank-pos">
-                      {ranked ? (medal[i] ?? `${i + 1}`) : '—'}
-                    </td>
-                    <td>
-                      <strong>{r.member}</strong>
-                      {r.advisory && (
-                        <span className="muted" style={{ fontSize: 12 }}>
-                          {' '}
-                          (참고)
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      {ranked ? (
-                        <>
-                          <b>{r.correct}</b>
-                          <span className="muted"> / {r.attempts}</span>
-                        </>
-                      ) : (
-                        <span className="muted">기록 없음</span>
-                      )}
-                    </td>
-                    <td>
-                      {ranked ? (
-                        <div className="rank-bar-row">
-                          <div className="rank-bar">
-                            <div
-                              className="rank-bar-fill"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="rank-pct">{pct}%</span>
-                        </div>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* 요약 지표 */}
+      <div className="stat-grid" style={{ marginTop: 8, marginBottom: 8 }}>
+        <div className="card primary">
+          <div className="muted">현재 선두</div>
+          <div className="stat">
+            {leader ? `${medal[0]} ${leader.member}` : '—'}
+          </div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            {leader
+              ? `적중률 ${Math.round(leader.winRate * 100)}% · ${leader.correct}/${leader.attempts}`
+              : '기록 없음'}
+          </div>
         </div>
-      )}
+        <div className="card">
+          <div className="muted">채점된 경기</div>
+          <div className="stat">{gradedCount}</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            종료·결과 확정 경기
+          </div>
+        </div>
+        <div className="card">
+          <div className="muted">참여자</div>
+          <div className="stat">{OPINION_MEMBERS.length}명</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            {OPINION_MEMBERS.join(' · ')}
+          </div>
+        </div>
+      </div>
 
+      {/* 순위표 (조별리그 순위표 형식) */}
+      <div className="card standings-card" style={{ marginTop: 8 }}>
+        <table className="standings-table rank-table">
+          <thead>
+            <tr>
+              <th style={{ width: 28 }}>#</th>
+              <th>플레이어</th>
+              <th title="예측한 채점 경기수" style={{ textAlign: 'center' }}>
+                참여
+              </th>
+              <th title="적중 수" style={{ textAlign: 'center' }}>
+                적중
+              </th>
+              <th style={{ width: '40%' }}>적중률</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const ranked = r.attempts > 0;
+              const pct = Math.round(r.winRate * 100);
+              return (
+                <tr key={r.member} className={ranked && i < 3 ? 'qualify' : ''}>
+                  <td className="muted rank-pos">{ranked ? i + 1 : '—'}</td>
+                  <td className="team">
+                    {r.member}
+                    {ranked && i < 3 ? ` ${medal[i]}` : ''}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>{r.attempts}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <strong>{r.correct}</strong>
+                  </td>
+                  <td>
+                    {ranked ? (
+                      <div className="rank-bar-row">
+                        <div className="rank-bar">
+                          <div
+                            className="rank-bar-fill"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="rank-pct">{pct}%</span>
+                      </div>
+                    ) : (
+                      <span className="muted">기록 없음</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 경기별 예측 상세 */}
       {details.length > 0 && (
         <>
           <h2>경기별 예측</h2>
@@ -150,6 +165,9 @@ export default async function RankingPage() {
             {details.map((d) => {
               const home = toKoreanTeam(d.homeName);
               const away = toKoreanTeam(d.awayName);
+              const con = consensus(opinionsByMatch[d.matchId] ?? [], MEMBERS);
+              const conCorrect =
+                con.agreed && d.result != null ? con.pick === d.result : null;
               return (
                 <div className="pred-match card" key={d.matchId}>
                   <div className="pred-match-head">
@@ -157,7 +175,8 @@ export default async function RankingPage() {
                       {home} <span className="muted">vs</span> {away}
                       <span className="muted" style={{ fontSize: 12 }}>
                         {' '}
-                        · {formatKickoff(d.kickoff)}
+                        · {formatKickoff(d.kickoff)} ·{' '}
+                        {statusText[d.status] ?? d.status}
                       </span>
                     </span>
                     {d.result && d.score ? (
@@ -169,6 +188,18 @@ export default async function RankingPage() {
                       <span className="pred-result-chip pending">결과 대기</span>
                     )}
                   </div>
+
+                  {con.agreed && (
+                    <div className="pred-consensus">
+                      🤝 3인 합의: <b>{pickLabel[con.pick!]}</b>
+                      {conCorrect === true
+                        ? ' · ✅ 합의 적중'
+                        : conCorrect === false
+                          ? ' · ❌ 합의 빗나감'
+                          : ''}
+                    </div>
+                  )}
+
                   <div className="pred-picks">
                     {d.picks.map((p) => (
                       <span
@@ -181,13 +212,7 @@ export default async function RankingPage() {
                               : ''
                         }`}
                       >
-                        {p.member}
-                        {p.advisory && (
-                          <span className="muted" style={{ fontSize: 11 }}>
-                            (참고)
-                          </span>
-                        )}{' '}
-                        <b>{pickLabel[p.pick]}</b>
+                        {p.member} <b>{pickLabel[p.pick]}</b>
                         {p.correct === true
                           ? ' ✅'
                           : p.correct === false
@@ -204,8 +229,8 @@ export default async function RankingPage() {
       )}
 
       <p className="muted" style={{ fontSize: 12, marginTop: 14 }}>
-        ※ 합의 대상 3인({MEMBERS.join(' · ')})과 참고인이 모두 집계됩니다. 종료된
-        경기에 입력한 의견만 채점합니다.
+        ※ 종료된 경기에 입력한 의견(승/무/패)만 채점합니다. 무승부 예측도 동일하게
+        집계됩니다.
       </p>
     </>
   );
