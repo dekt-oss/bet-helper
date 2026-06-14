@@ -40,7 +40,7 @@ export default async function PoolPage() {
       </p>
 
       {/* 핵심 지표 */}
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+      <div className="stat-grid">
         <div className="card">
           <div className="muted">현재 잔액</div>
           <div className="stat">{won(pool.balance)}</div>
@@ -60,10 +60,7 @@ export default async function PoolPage() {
         </div>
       </div>
 
-      <div
-        className="grid"
-        style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 12 }}
-      >
+      <div className="stat-grid" style={{ marginTop: 12 }}>
         <div className="card">
           <div className="muted">누적 베팅액</div>
           <div style={{ fontSize: 20, fontWeight: 700 }}>{won(pool.staked)}</div>
@@ -91,7 +88,7 @@ export default async function PoolPage() {
       <p className="muted" style={{ fontSize: 13 }}>
         손익·잔액을 인원수로 똑같이 나눈 1인 기준 금액입니다.
       </p>
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+      <div className="stat-grid">
         <div className="card">
           <div className="muted">개인당 예상 손익</div>
           <div className="stat" style={{ color: profitColor }}>

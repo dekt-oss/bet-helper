@@ -53,6 +53,7 @@ header.site .inner {
 
 header.site .brand {
   font-weight: 700;
+  white-space: nowrap;
 }
 
 nav a {
@@ -74,6 +75,16 @@ nav a:hover {
 .grid {
   display: grid;
   gap: 12px;
+}
+
+/* 요약 통계 카드: 화면 폭에 맞춰 칸 수 자동 조절(모바일에서 넘침 방지) */
+.stat-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.stat-grid .stat {
+  white-space: nowrap;
 }
 
 .match-item {
@@ -398,6 +409,37 @@ button.danger:hover {
   .form-grid {
     grid-template-columns: 1fr;
   }
+  /* 헤더: 좁은 화면에서 메뉴가 가로 스크롤되게(2줄 깨짐 방지) */
+  header.site .inner {
+    gap: 10px;
+    overflow-x: auto;
+  }
+  nav {
+    white-space: nowrap;
+  }
+  nav a {
+    margin-right: 12px;
+  }
+  /* 통계 숫자 살짝 축소 */
+  .stat {
+    font-size: 23px;
+  }
+  /* 승부식 카드: 팀명 / 점수·상태·시각을 위아래로 분리해 가독성 확보 */
+  .odds-card-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .odds-card-right {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .odds-card-date {
+    font-size: 12px;
+    color: var(--muted);
+  }
 }
 
 /* ── 순위/대진: 진행중 스테이지 배지 ─────────────────────── */
@@ -444,6 +486,8 @@ button.danger:hover {
 .odds-card-teams {
   font-weight: 600;
   min-width: 0;
+  /* 한글 팀명이 글자 중간에서 줄바꿈되지 않게(공백 단위로만 줄바꿈) */
+  word-break: keep-all;
 }
 .odds-card-date {
   font-size: 13px;

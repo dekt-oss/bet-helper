@@ -55,7 +55,7 @@ export default async function FixturesPage() {
         출처 {source} · 경기를 누르면 정보·3인 의견·베팅
       </p>
 
-      <OddsHealthBanner odds={odds} />
+      <OddsHealthBanner odds={odds} matches={matches} />
 
       <MatchBoard
         matches={matches}

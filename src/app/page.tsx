@@ -70,9 +70,9 @@ export default async function DashboardPage() {
         경기 데이터 출처: <strong>{source}</strong> · 공동자금 현황
       </p>
 
-      <OddsHealthBanner odds={odds} />
+      <OddsHealthBanner odds={odds} matches={matches} />
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="stat-grid">
         <div className="card">
           <div className="muted">현재 잔액</div>
           <div className="stat">{won(pool.balance)}</div>

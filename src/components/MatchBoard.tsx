@@ -299,7 +299,7 @@ export function MatchBoard({
                     >
                       {oddsSourceLabel(t.source)} 배당
                       {t.updatedAt ? ` · 갱신 ${formatOddsTime(t.updatedAt)}` : ''}
-                      {t.source === 'betman' ? ' · 약 15분마다 자동 갱신' : ''}
+                      {t.source === 'betman' ? ' · 자동 갱신' : ''}
                     </div>
                   )}
                 </>
