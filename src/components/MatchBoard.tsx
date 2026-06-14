@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Match, Outcome, Opinion, Bet } from '@/lib/types';
@@ -115,10 +115,31 @@ export function MatchBoard({
   const router = useRouter();
   const [sort, setSort] = useState<SortKey>('korea');
   const [filter, setFilter] = useState<string>('all');
-  const [onlyUpcoming, setOnlyUpcoming] = useState(false);
+  // 기본값: 예정/진행중만 보기(끝난 경기는 체크 해제 시 표시).
+  const [onlyUpcoming, setOnlyUpcoming] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
   const [betPick, setBetPick] = useState<Outcome | undefined>(undefined);
   const [editOps, setEditOps] = useState(false);
+
+  // 의견/베팅 저장 시 서버 액션 revalidate 로 컴포넌트가 다시 마운트되면 열린 카드가
+  // 닫혀 보일 수 있다. 열린 경기를 sessionStorage 에 보존해 저장 후에도 펼쳐진 상태 유지.
+  const OPEN_KEY = 'gugu-open-match';
+  const EDIT_KEY = 'gugu-open-editops';
+  useEffect(() => {
+    const saved = sessionStorage.getItem(OPEN_KEY);
+    if (saved) {
+      setOpenId(saved);
+      if (sessionStorage.getItem(EDIT_KEY) === '1') setEditOps(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (openId) sessionStorage.setItem(OPEN_KEY, openId);
+    else sessionStorage.removeItem(OPEN_KEY);
+  }, [openId]);
+  useEffect(() => {
+    if (editOps) sessionStorage.setItem(EDIT_KEY, '1');
+    else sessionStorage.removeItem(EDIT_KEY);
+  }, [editOps]);
 
   const groups = useMemo(() => {
     const set = new Set<string>();

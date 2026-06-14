@@ -143,10 +143,10 @@ export default async function BetsPage() {
                 const v = rowView(b);
                 return (
                   <tr key={b.id}>
-                    <td className="muted" style={{ whiteSpace: 'nowrap' }}>
+                    <td data-label="베팅일시" className="muted" style={{ whiteSpace: 'nowrap' }}>
                       {fmtWhen(b.createdAt)}
                     </td>
-                    <td>
+                    <td data-label="경기" className="cell-stack">
                       {label}
                       {m && (
                         <div className="muted" style={{ fontSize: 11 }}>
@@ -154,14 +154,14 @@ export default async function BetsPage() {
                         </div>
                       )}
                     </td>
-                    <td>{m ? pickText(b.pick, homeKor, awayKor) : b.pick}</td>
-                    <td>{b.oddsAtPlacement.toFixed(2)}</td>
-                    <td>{won(b.stake)}</td>
-                    <td style={{ color: v.color, whiteSpace: 'nowrap' }}>
+                    <td data-label="선택">{m ? pickText(b.pick, homeKor, awayKor) : b.pick}</td>
+                    <td data-label="배당">{b.oddsAtPlacement.toFixed(2)}</td>
+                    <td data-label="금액">{won(b.stake)}</td>
+                    <td data-label="상태" style={{ color: v.color, whiteSpace: 'nowrap' }}>
                       {v.status}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{v.payout}</td>
-                    <td>
+                    <td data-label="수령" style={{ whiteSpace: 'nowrap' }}>{v.payout}</td>
+                    <td data-label="">
                       <DeleteBet id={b.id} />
                     </td>
                   </tr>

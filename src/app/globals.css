@@ -6,6 +6,52 @@
   --muted: #9aa3b2;
   --accent: #3ddc84;
   --live: #ff4d4f;
+
+  /* ── design tokens (refresh) ─────────────────────────── */
+  --panel-2: #1c2029;
+  --surface-soft: rgba(255, 255, 255, 0.03);
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.45);
+  --space-section: 36px;
+}
+
+/* ── 타이포 & 리듬 (refresh) ─────────────────────────── */
+h1 {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+h2 {
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: var(--space-section) 0 12px;
+}
+p.muted {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: var(--space-section) 0 12px;
+}
+.section-head h2 {
+  margin: 0;
+}
+.section-head a {
+  font-size: 13px;
+  color: var(--muted);
+}
+.section-head a:hover {
+  color: var(--text);
 }
 
 * {
@@ -68,8 +114,9 @@ nav a:hover {
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 .grid {
@@ -77,14 +124,39 @@ nav a:hover {
   gap: 12px;
 }
 
-/* 요약 통계 카드: 화면 폭에 맞춰 칸 수 자동 조절(모바일에서 넘침 방지) */
+/* 요약 통계 카드(히어로 메트릭): 화면 폭에 맞춰 칸 수 자동 조절 */
 .stat-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+.stat-grid .card {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 60%),
+    var(--panel);
+}
+.stat-grid .card > .muted:first-child {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .stat-grid .stat {
   white-space: nowrap;
+}
+.stat-grid .card.primary {
+  border-color: rgba(61, 220, 132, 0.25);
+}
+.stat-grid .card.primary::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(var(--accent), rgba(61, 220, 132, 0.3));
 }
 
 .match-item {
@@ -178,6 +250,10 @@ nav a:hover {
 .stat {
   font-size: 28px;
   font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 6px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums; /* 새로고침 때 숫자 흔들림 방지 */
 }
 
 table {
@@ -310,12 +386,95 @@ button.danger:hover {
   align-items: center;
 }
 
-/* 좁은 화면에서 넓은 테이블은 가로 스크롤 */
+/* ── 반응형 테이블 → 카드(refresh): 모바일 가로 스크롤 제거 ─── */
 .table-wrap {
-  overflow-x: auto;
+  overflow-x: visible;
 }
 .table-wrap table {
-  min-width: 720px;
+  min-width: 0;
+}
+thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+tbody tr {
+  transition: background 0.12s ease;
+}
+tbody tr:hover {
+  background: var(--surface-soft);
+}
+th,
+td {
+  padding: 10px 12px;
+}
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+@media (max-width: 640px) {
+  .table-wrap {
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+  .table-wrap table,
+  .table-wrap thead,
+  .table-wrap tbody,
+  .table-wrap tr,
+  .table-wrap td {
+    display: block;
+    width: 100%;
+  }
+  .table-wrap thead {
+    display: none;
+  }
+  .table-wrap tr {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 6px 14px;
+    margin-bottom: 10px;
+  }
+  .table-wrap tr:hover {
+    background: var(--panel);
+  }
+  .table-wrap td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border-soft);
+    text-align: right;
+    white-space: normal;
+  }
+  .table-wrap td:last-child {
+    border-bottom: none;
+  }
+  .table-wrap td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    flex: 0 0 auto;
+  }
+  .table-wrap td[data-label='']::before {
+    content: none;
+  }
+  .table-wrap td[data-label=''] {
+    justify-content: flex-end;
+  }
+  /* 경기 셀: 라벨/팀명이 길면 세로로 쌓기 */
+  .table-wrap td.cell-stack {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 2px;
+  }
 }
 
 /* ── 조별순위: 컴팩트 카드 그리드 ─────────────────────── */
