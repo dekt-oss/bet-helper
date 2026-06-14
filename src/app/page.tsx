@@ -5,6 +5,7 @@ import { computePoolBalance } from '@/lib/pool/balance';
 import { MatchList, type OddsTriple } from '@/components/MatchList';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { OddsHealthBanner } from '@/components/OddsHealthBanner';
+import { getBetmanHeartbeat } from '@/lib/odds/status';
 import { sortKoreaFirst, isKoreaMatch, toKoreanTeam } from '@/lib/teams/korea';
 
 export const dynamic = 'force-dynamic';
@@ -22,9 +23,10 @@ const statusLabel: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const [{ matches, source }, { odds }] = await Promise.all([
+  const [{ matches, source }, { odds }, heartbeat] = await Promise.all([
     getMatches(),
     getOdds(),
+    getBetmanHeartbeat(),
   ]);
   const bets = await listBetsSettled(matches);
   const pool = computePoolBalance(bets);
@@ -70,7 +72,7 @@ export default async function DashboardPage() {
         경기 데이터 출처: <strong>{source}</strong> · 공동자금 현황
       </p>
 
-      <OddsHealthBanner odds={odds} matches={matches} />
+      <OddsHealthBanner odds={odds} matches={matches} heartbeat={heartbeat} />
 
       <div className="stat-grid">
         <div className="card primary">

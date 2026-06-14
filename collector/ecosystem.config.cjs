@@ -6,9 +6,10 @@ module.exports = {
       name: 'betman-collector',
       script: 'collect.js',
       cwd: __dirname,
-      autorestart: true,
-      max_restarts: 20,
-      restart_delay: 30000,
+      autorestart: true, // process.exit(0/1) 후 자동 재기동(무중단 회복의 최후 보루)
+      max_restarts: 50,
+      exp_backoff_restart_delay: 5000, // 연속 실패 시 점증 지연(핫루프 방지)
+      min_uptime: 30000,
       env: { HEADLESS: 'true' },
     },
   ],

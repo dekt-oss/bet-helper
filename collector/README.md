@@ -77,7 +77,18 @@ pm2 save
 ## 운용
 
 - 1회 실행(cron 용): `npm run once`
-- 주기 루프(pm2 용): `npm start`  (기본 12분 ± 120초)
+- 주기 루프(pm2 용): `npm start`  (기본 2시간 / 경기 12시간 전부터 90분, keep-alive 25분)
+
+### 무중단(자동 회복)
+- 매 사이클을 **새 브라우저 + 워치독(기본 210초)** 으로 감싼다. 어떤 작업이 멈춰도(hang) 브라우저를
+  **강제 종료(트리킬)** 하고 다음 주기에 회복한다 → 예전처럼 조용히 멈추지 않는다.
+- 연속 hang `MAX_FAILS`회 또는 `RESTART_HOURS`마다 `process.exit` → **pm2 가 새 프로세스로 재기동**.
+- 매 tick `tick…` 로그가 찍히므로 멈춤 여부를 로그로 바로 확인 가능.
+- 조정: `.env` 의 `CYCLE_TIMEOUT_SEC`, `MAX_FAILS`, `RESTART_HOURS`.
+
+> ⚠️ **pm2 자동기동 필수**: 위 회복은 pm2 의 autorestart 에 의존한다. **윈도우는 `pm2 startup` 미지원**이라
+> 부팅 후 pm2 가 안 뜰 수 있다 → `npm i -g pm2-windows-startup && pm2-startup install` (또는 작업
+> 스케줄러/NSSM)로 **부팅 자동기동을 반드시 설정**해야 진짜 무중단이 된다. `pm2 save` 도 필수.
 
 ### cron 예시
 ```cron

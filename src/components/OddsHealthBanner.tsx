@@ -47,17 +47,25 @@ function expectedIntervalMin(matches: Match[]): number {
 export function OddsHealthBanner({
   odds,
   matches = [],
+  heartbeat,
 }: {
   odds: Odds[];
   matches?: Match[];
+  /** 수집기 마지막 성공 시각(ISO). 있으면 이를 권위 있는 '마지막 갱신'으로 사용. */
+  heartbeat?: string | null;
 }) {
+  // 우선순위: 수집 하트비트(실제 마지막 수집) > 화면에 보이는 베트맨 배당 updatedAt 최대값.
+  const hbMs = heartbeat ? new Date(heartbeat).getTime() : NaN;
   const times = odds
     .filter((o) => o.source === 'betman')
     .map((o) => new Date(o.updatedAt).getTime())
     .filter((n) => Number.isFinite(n));
-  if (times.length === 0) return null; // 베트맨 배당이 아직 없으면 배너 숨김
-
-  const lastMs = Math.max(...times);
+  const lastMs = Number.isFinite(hbMs)
+    ? hbMs
+    : times.length > 0
+      ? Math.max(...times)
+      : NaN;
+  if (!Number.isFinite(lastMs)) return null; // 베트맨 수집 기록이 없으면 배너 숨김
   const minAgo = Math.round((Date.now() - lastMs) / 60_000);
   const stale = minAgo > STALE_MIN;
 
