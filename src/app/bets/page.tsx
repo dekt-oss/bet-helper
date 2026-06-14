@@ -1,9 +1,7 @@
 import { listBetsSettled, summarize } from '@/lib/bets/store';
-import { getMatches, getOdds } from '@/lib/data-sources';
-import { BetForm, type OddsTriple } from '@/components/BetForm';
+import { getMatches } from '@/lib/data-sources';
 import { DeleteBet } from '@/components/DeleteBet';
 import { AutoRefresh } from '@/components/AutoRefresh';
-import { buildMatchOptions } from '@/lib/teams/options';
 import { toKoreanTeam } from '@/lib/teams/korea';
 import type { Match, Outcome } from '@/lib/types';
 
@@ -59,22 +57,12 @@ function scoreOutcome(s: { home: number; away: number }): Outcome {
 const ACCENT = 'var(--accent)';
 const RED = 'var(--live)';
 
-export default async function BetsPage({
-  searchParams,
-}: {
-  searchParams?: { match?: string };
-}) {
-  const [{ matches }, { odds }] = await Promise.all([getMatches(), getOdds()]);
+export default async function BetsPage() {
+  const { matches } = await getMatches();
   // 종료된 경기의 PENDING 베팅은 결과대로 자동 정산.
   const bets = await listBetsSettled(matches);
-  const initialMatchId = searchParams?.match;
   const stats = summarize(bets);
 
-  const matchOptions = buildMatchOptions(matches);
-  const oddsByMatch: Record<string, OddsTriple> = {};
-  for (const o of odds) {
-    oddsByMatch[o.matchId] = { home: o.home, draw: o.draw, away: o.away };
-  }
   const matchById = new Map<string, Match>(matches.map((m) => [m.id, m]));
 
   // 베팅 한 건의 표시용 상태/수령(경기 진행상황 반영) 계산.
@@ -129,14 +117,8 @@ export default async function BetsPage({
         </strong>
       </p>
 
-      <BetForm
-        matches={matchOptions}
-        oddsByMatch={oddsByMatch}
-        initialMatchId={initialMatchId}
-      />
-
       {bets.length === 0 ? (
-        <p className="muted">아직 등록된 베팅이 없습니다. 위 폼으로 추가하세요.</p>
+        <p className="muted">아직 등록된 베팅이 없습니다.</p>
       ) : (
         <div className="card table-wrap">
           <table>
