@@ -192,11 +192,16 @@ function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
             </div>
           )}
         </dl>
-        <div className="match-detail-actions">
-          <Link href={`/bets?match=${encodeURIComponent(m.id)}`} className="bet-link">
-            🎯 이 경기 베팅하기 →
-          </Link>
-        </div>
+        {m.status === 'SCHEDULED' && (
+          <div className="match-detail-actions">
+            <Link
+              href={`/fixtures?match=${encodeURIComponent(m.id)}`}
+              className="bet-link"
+            >
+              🎯 이 경기 베팅하기 →
+            </Link>
+          </div>
+        )}
         </>
       )}
     </div>

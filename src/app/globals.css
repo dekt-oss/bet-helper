@@ -865,6 +865,18 @@ tbody tr:last-child td {
   color: var(--text); /* 미입력 안내 = 흰색/중립 */
 }
 
+/* 진행 상황(스코어·득점자) */
+.live-score {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.scorers {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+
 /* 의견 요약(읽기전용) + 펼치기 토글 */
 .opinion-summary {
   display: flex;

@@ -95,6 +95,7 @@ function TeamDetail({ name }: { name: string }) {
 
 export function MatchBoard({
   matches,
+  initialOpenId,
   oddsByMatch,
   opinionsByMatch,
   betsByMatch,
@@ -104,6 +105,7 @@ export function MatchBoard({
   advisoryMembers,
 }: {
   matches: Match[];
+  initialOpenId?: string;
   oddsByMatch: Record<string, OddsTriple>;
   opinionsByMatch: Record<string, Opinion[]>;
   betsByMatch: Record<string, Bet[]>;
@@ -126,11 +128,17 @@ export function MatchBoard({
   const OPEN_KEY = 'gugu-open-match';
   const EDIT_KEY = 'gugu-open-editops';
   useEffect(() => {
+    // 다른 화면에서 '이 경기 베팅하기'로 넘어온 경우(?match=) 그 경기를 펼친다.
+    if (initialOpenId) {
+      setOpenId(initialOpenId);
+      return;
+    }
     const saved = sessionStorage.getItem(OPEN_KEY);
     if (saved) {
       setOpenId(saved);
       if (sessionStorage.getItem(EDIT_KEY) === '1') setEditOps(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     if (openId) sessionStorage.setItem(OPEN_KEY, openId);
@@ -328,6 +336,52 @@ export function MatchBoard({
 
               {isOpen && (
                 <div className="odds-detail">
+                  {/* 진행 상황(스코어·득점자·경기장) — 진행중/종료 또는 스코어/득점자 있을 때 */}
+                  {(m.score ||
+                    isLive ||
+                    (m.scorers &&
+                      (m.scorers.home.length > 0 || m.scorers.away.length > 0))) && (
+                    <div className="detail-block">
+                      <h4>
+                        진행 상황
+                        {isLive && m.minute
+                          ? ` · ${m.minute}'`
+                          : m.status === 'FINISHED'
+                            ? ' · 종료'
+                            : ''}
+                      </h4>
+                      {m.score && (
+                        <div className="live-score">
+                          {home} <b>{m.score.home}</b>
+                          <span className="muted"> : </span>
+                          <b>{m.score.away}</b> {away}
+                        </div>
+                      )}
+                      {m.scorers &&
+                        (m.scorers.home.length > 0 || m.scorers.away.length > 0) && (
+                          <div className="scorers">
+                            {m.scorers.home.length > 0 && (
+                              <div>
+                                <span className="muted">⚽ {home}</span>{' '}
+                                {m.scorers.home.join(', ')}
+                              </div>
+                            )}
+                            {m.scorers.away.length > 0 && (
+                              <div>
+                                <span className="muted">⚽ {away}</span>{' '}
+                                {m.scorers.away.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      {m.venue && (
+                        <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                          경기장: {m.venue}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* 팀 정보 */}
                   <div className="detail-block">
                     <h4>경기 정보</h4>
