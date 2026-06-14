@@ -6,6 +6,7 @@
 
 import type { Match, Odds } from '@/lib/types';
 import { teamCanon } from '@/lib/teams/korea';
+import { fetchWithTimeout } from '@/lib/http';
 
 const SPORT = 'soccer_fifa_world_cup';
 
@@ -43,7 +44,7 @@ export async function fetchWorldCupOdds(matches: Match[]): Promise<Odds[]> {
     `?apiKey=${key}&regions=eu&markets=h2h&oddsFormat=decimal`;
   // ⚠️ 무료 키는 월 500회. 6시간 캐시로 하루 최대 4회(월 ~120회)만 호출한다.
   // (페이지 새로고침/자동갱신이 잦아도 이 캐시 안에서는 추가 호출이 없다)
-  const res = await fetch(url, { next: { revalidate: 21600 } });
+  const res = await fetchWithTimeout(url, { next: { revalidate: 21600 } });
   // 남은 호출 횟수를 로그로 남겨 소진 여부를 확인할 수 있게 한다.
   const remaining = res.headers.get('x-requests-remaining');
   if (remaining) console.info(`[the-odds-api] 남은 호출: ${remaining}`);
@@ -70,7 +71,7 @@ export async function fetchHistoricalWorldCupOdds(
     `https://api.the-odds-api.com/v4/historical/sports/${SPORT}/odds/` +
     `?apiKey=${key}&regions=eu&markets=h2h&oddsFormat=decimal` +
     `&date=${encodeURIComponent(isoDate)}`;
-  const res = await fetch(url, { cache: 'force-cache' });
+  const res = await fetchWithTimeout(url, { cache: 'force-cache' });
   const remaining = res.headers.get('x-requests-remaining');
   if (remaining) console.info(`[the-odds-api/historical] 남은 호출: ${remaining}`);
   if (!res.ok) throw new Error(`the-odds-api historical ${res.status}`);

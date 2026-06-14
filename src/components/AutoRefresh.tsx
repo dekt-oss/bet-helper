@@ -11,6 +11,9 @@ export function AutoRefresh({ intervalMs = 60000 }: { intervalMs?: number }) {
 
   useEffect(() => {
     const tick = () => {
+      // 탭이 백그라운드일 때는 새로고침하지 않는다.
+      // (보이지 않는 화면을 갱신하느라 생기는 불필요한 서버 부하/버퍼링 방지)
+      if (typeof document !== 'undefined' && document.hidden) return;
       router.refresh();
       setUpdatedAt(new Date());
     };
