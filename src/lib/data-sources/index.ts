@@ -4,7 +4,6 @@
 
 import type { Match, Odds } from '@/lib/types';
 import { cache } from 'react';
-import { unstable_cache } from 'next/cache';
 import { fetchWorldCupFixtures } from './openfootball';
 import {
   fetchWorldcup26Matches,
@@ -33,14 +32,7 @@ import { listOdds, upsertOdds } from '@/lib/odds/store';
  */
 // React cache(): 한 번의 요청(렌더) 안에서 중복 호출을 메모이즈한다.
 // (페이지가 getMatches() 와 getOdds()[내부에서 다시 getMatches()]를 호출 → 캐시로 1회만 실행)
-// 핵심 성능: 경기 목록을 60초 데이터캐시(unstable_cache)로 공유한다.
-// worldcup26.ir JWT 인증 등 느린 외부 호출이 매 네비게이션마다 반복되던 것을 제거 →
-// 첫 1회만 외부 호출, 이후 60초는 모든 요청/자동새로고침이 캐시에서 즉시 응답.
-// (cache(): 한 렌더 안에서 중복 호출 메모이즈, unstable_cache: 요청 간 공유)
-const getMatchesShared = unstable_cache(_getMatches, ['gugu-matches-v1'], {
-  revalidate: 60,
-});
-export const getMatches = cache(getMatchesShared);
+export const getMatches = cache(_getMatches);
 
 async function _getMatches(): Promise<{
   matches: Match[];

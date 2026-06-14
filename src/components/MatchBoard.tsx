@@ -341,12 +341,16 @@ export function MatchBoard({
                   <div className="detail-block">
                     <h4>
                       3인 의견
-                      {con.agreed ? (
+                      {con.status === 'agreed' ? (
                         <span className="consensus-badge ok">
                           합의됨 · {pickLabel[con.pick!]}
                         </span>
+                      ) : con.status === 'disagree' ? (
+                        <span className="consensus-badge warn">미합치 (의견 갈림)</span>
                       ) : (
-                        <span className="consensus-badge warn">미합의</span>
+                        <span className="consensus-badge none">
+                          미입력 ({con.enteredCount}/{con.total})
+                        </span>
                       )}
                     </h4>
                     <div className="opinion-summary">
@@ -417,9 +421,15 @@ export function MatchBoard({
                     <h4>{bettable ? '베팅 등록' : '결과'}</h4>
                     {bettable ? (
                       <>
-                        {!con.agreed && (
+                        {con.status === 'incomplete' && (
+                          <p className="warn-text neutral">
+                            아직 3인 의견 미입력입니다 ({con.enteredCount}/{con.total}). 모두
+                            입력 후 베팅을 권장합니다.
+                          </p>
+                        )}
+                        {con.status === 'disagree' && (
                           <p className="warn-text">
-                            ⚠ 아직 3인 합의 전입니다. 합의 후 베팅을 권장합니다.
+                            ⚠ 3인 의견이 갈렸습니다(미합치). 합의 후 베팅을 권장합니다.
                           </p>
                         )}
                         <BetForm
