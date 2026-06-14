@@ -778,7 +778,12 @@ tbody tr:last-child td {
 }
 .consensus-badge.warn {
   color: #fff;
-  background: #d97706;
+  background: var(--live); /* 미합치(의견 갈림) = 빨강 */
+}
+.consensus-badge.none {
+  color: var(--text); /* 미입력 = 흰색/중립 */
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
 }
 .bet-badge {
   font-size: 11px;
@@ -854,7 +859,10 @@ tbody tr:last-child td {
 .warn-text {
   margin: 0 0 8px;
   font-size: 13px;
-  color: #f59e0b;
+  color: var(--live); /* 미합치 경고 = 빨강 */
+}
+.warn-text.neutral {
+  color: var(--text); /* 미입력 안내 = 흰색/중립 */
 }
 
 /* 의견 요약(읽기전용) + 펼치기 토글 */

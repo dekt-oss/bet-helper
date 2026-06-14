@@ -27,6 +27,13 @@ function agoText(min: number): string {
   return `${h}시간 ${min % 60}분 전`;
 }
 
+function afterText(min: number): string {
+  if (min <= 0) return '잠시 후';
+  if (min < 60) return `${min}분 후`;
+  const h = Math.floor(min / 60);
+  return `${h}시간 ${min % 60}분 후`;
+}
+
 /** 가장 가까운 예정/진행 경기까지의 시간으로 다음 수집 간격(분)을 추정. */
 function expectedIntervalMin(matches: Match[]): number {
   const now = Date.now();
@@ -61,7 +68,8 @@ export function OddsHealthBanner({
 
   const intervalMin = expectedIntervalMin(matches);
   const nextMs = lastMs + intervalMin * 60_000;
-  const nextText = nextMs <= Date.now() ? '곧' : `~${fmtKst(nextMs)}`;
+  const minToNext = Math.round((nextMs - Date.now()) / 60_000);
+  const nextText = `${afterText(minToNext)} (${fmtKst(nextMs)})`;
 
   const base: React.CSSProperties = {
     borderRadius: 10,

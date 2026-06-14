@@ -93,6 +93,7 @@ const TEAM_ALIASES: Record<string, string> = {
   // 아시아
   일본: 'japan',
   이란: 'iran',
+  이라크: 'iraq',
   사우디아라비아: 'saudiarabia',
   사우디: 'saudiarabia',
   카타르: 'qatar',
@@ -100,6 +101,11 @@ const TEAM_ALIASES: Record<string, string> = {
   오스트레일리아: 'australia',
   우즈베키스탄: 'uzbekistan',
   요르단: 'jordan',
+  아랍에미리트: 'unitedarabemirates',
+  uae: 'unitedarabemirates',
+  오만: 'oman',
+  바레인: 'bahrain',
+  팔레스타인: 'palestine',
   // 북중미·카리브
   멕시코: 'mexico',
   미국: 'usa',
@@ -362,11 +368,15 @@ function teamPairKey(a: string, b: string): string {
 }
 
 function normalizeTeamName(name: string): string {
-  // 기본 정규화: 괄호 내용 제거 → 소문자 → 공백 제거.
+  // 기본 정규화: 괄호 제거 → 소문자 → 악센트(발음기호) 제거 → 공백 제거.
+  // (Curaçao→curacao 처럼 영문 일정과 베트맨 표기가 악센트 때문에 안 맞던 문제 방지)
   const base = name
     .replace(/\(.*?\)/g, '')
     .trim()
     .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .normalize('NFC') // 한글은 다시 결합(자모 분해 방지)
     .replace(/\s+/g, '');
   // 별칭 테이블(한글/영문 변형)을 표준값으로 수렴.
   return TEAM_ALIASES[base] ?? base;

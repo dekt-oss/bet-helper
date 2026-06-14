@@ -7,6 +7,7 @@
 // ⚠️ 외부 egress 가 막힌 개발 환경에서는 실패하므로, 호출부에서 반드시 폴백한다.
 
 import type { Match, Team } from '@/lib/types';
+import { unstable_cache } from 'next/cache';
 
 const BASE = process.env.WORLDCUP26_BASE_URL ?? 'https://worldcup26.ir';
 // 공개 월드컵 데이터라 민감하지 않다. 환경변수로 덮어쓸 수 있게 둔다.
@@ -29,9 +30,9 @@ const COMMON_HEADERS: Record<string, string> = {
 };
 
 // ── 인증(JWT) ────────────────────────────────────────────
-// 토큰을 모듈 스코프에 캐시한다(웜 람다 재사용). 50분 후 만료로 간주해 재발급.
-let cachedToken: { value: string; expiresAt: number } | null = null;
-const TOKEN_TTL_MS = 50 * 60 * 1000;
+// 토큰을 Next 데이터캐시(unstable_cache, 45분)로 공유한다. 서버리스에서 모듈 스코프
+// 캐시는 매 콜드스타트마다 날아가 재인증이 반복돼 느렸으므로, 토큰을 요청 간 캐시해
+// 재인증을 없앤다(속도). 캐시 만료(45분) < 토큰수명(50분)이라 안전.
 
 function pickToken(body: unknown): string | null {
   if (!body || typeof body !== 'object') return null;
@@ -49,11 +50,12 @@ async function rawPost(
   path: string,
   body: Record<string, unknown>,
 ): Promise<Response> {
+  // no-store 를 쓰지 않는다(POST 는 어차피 캐시 안 됨). unstable_cache 안에서 호출돼도
+  // 충돌하지 않도록 기본 캐시 모드로 둔다.
   return fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: { ...COMMON_HEADERS, 'content-type': 'application/json' },
     body: JSON.stringify(body),
-    cache: 'no-store',
   });
 }
 
@@ -82,15 +84,25 @@ async function register(): Promise<string | null> {
   }
 }
 
-async function getToken(): Promise<string | null> {
-  if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value;
-
-  // 로그인 → 실패하면 계정 자동 등록(등록 응답에 토큰 포함).
+// 실제 발급(로그인 → 실패 시 자동 등록). 실패하면 throw → 캐시되지 않고 다음에 재시도.
+async function fetchFreshToken(): Promise<string> {
   let token = await authenticate();
   if (!token) token = await register();
-  if (!token) return null;
-  cachedToken = { value: token, expiresAt: Date.now() + TOKEN_TTL_MS };
+  if (!token) throw new Error('worldcup26: 인증 토큰 발급 실패');
   return token;
+}
+
+// 45분 데이터캐시. null 캐싱을 피하려고 실패 시 throw 하는 fetchFreshToken 을 감싼다.
+const getTokenCached = unstable_cache(fetchFreshToken, ['worldcup26-jwt-v1'], {
+  revalidate: 45 * 60,
+});
+
+async function getToken(): Promise<string | null> {
+  try {
+    return await getTokenCached();
+  } catch {
+    return null;
+  }
 }
 
 async function apiGet<T>(path: string, revalidate: number): Promise<T> {
@@ -101,10 +113,13 @@ async function apiGet<T>(path: string, revalidate: number): Promise<T> {
     next: { revalidate },
   });
   if (res.status === 401) {
-    // 토큰 만료 가능 → 1회 무효화 후 재시도.
-    cachedToken = null;
-    const fresh = await getToken();
-    if (!fresh) throw new Error('worldcup26: 재인증 실패');
+    // 토큰 만료 가능 → 캐시 우회하고 신선 토큰으로 1회 재시도.
+    let fresh: string;
+    try {
+      fresh = await fetchFreshToken();
+    } catch {
+      throw new Error('worldcup26: 재인증 실패');
+    }
     const retry = await fetch(`${BASE}${path}`, {
       headers: { authorization: `Bearer ${fresh}` },
       next: { revalidate },

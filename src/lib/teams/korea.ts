@@ -77,6 +77,17 @@ const KOREAN: Record<string, string> = {
   capeverde: '카보베르데',
   curacao: '퀴라소',
   haiti: '아이티',
+  iraq: '이라크',
+  uae: '아랍에미리트',
+  unitedarabemirates: '아랍에미리트',
+  oman: '오만',
+  bahrain: '바레인',
+  palestine: '팔레스타인',
+  venezuela: '베네수엘라',
+  bolivia: '볼리비아',
+  slovakia: '슬로바키아',
+  slovenia: '슬로베니아',
+  finland: '핀란드',
   drcongo: '콩고민주공화국',
   congodr: '콩고민주공화국',
   democraticrepublicofthecongo: '콩고민주공화국',
@@ -90,6 +101,9 @@ function normalize(name: string | null | undefined): string {
     .replace(/\(.*?\)/g, '')
     .trim()
     .toLowerCase()
+    .normalize('NFD') // 악센트 분리 후
+    .replace(/[̀-ͯ]/g, '') // 발음기호 제거(Curaçao→curacao, Türkiye→turkiye)
+    .normalize('NFC') // 한글은 다시 결합(자모 분해 방지)
     .replace(/&/g, 'and')
     .replace(/[\s.'’-]/g, '');
 }
