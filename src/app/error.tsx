@@ -29,6 +29,24 @@ export default function Error({
           오류 코드: {error.digest}
         </p>
       )}
+      {error.message && (
+        <details style={{ marginTop: 8 }}>
+          <summary className="muted" style={{ fontSize: 12, cursor: 'pointer' }}>
+            오류 상세
+          </summary>
+          <pre
+            style={{
+              fontSize: 11,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+              color: 'var(--muted)',
+              marginTop: 6,
+            }}
+          >
+            {error.message}
+          </pre>
+        </details>
+      )}
       <div className="btn-row" style={{ marginTop: 12 }}>
         <button type="button" className="primary" onClick={() => reset()}>
           다시 시도
