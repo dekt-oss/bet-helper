@@ -240,6 +240,9 @@ export function MatchBoard({
           const isOpen = openId === m.id;
           const opinions = opinionsByMatch[m.id] ?? [];
           const con = consensus(opinions, consensusMembers);
+          const opinionCount = opinions.filter(
+            (o) => o.pick || o.comment,
+          ).length;
           const myBets = betsByMatch[m.id] ?? [];
 
           const buttons: { key: Outcome; label: string; value: number }[] = t
@@ -268,6 +271,9 @@ export function MatchBoard({
                     <span className="consensus-badge ok">
                       ✅ 합의 {pickLabel[con.pick!]}
                     </span>
+                  )}
+                  {opinionCount > 0 && !con.agreed && (
+                    <span className="opinion-badge">💬 의견 {opinionCount}명</span>
                   )}
                   {myBets.length > 0 && (
                     <span className="bet-badge">🎫 베팅 {myBets.length}건</span>
