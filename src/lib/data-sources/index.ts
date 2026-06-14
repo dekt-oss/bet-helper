@@ -2,6 +2,7 @@
 // 화면/ API 라우트는 개별 소스를 직접 부르지 말고 여기 함수만 사용한다.
 // 이렇게 하면 "무료 API → 유료 API → 정적 데이터" 폴백 전략을 한 곳에서 관리할 수 있다.
 
+import { cache } from 'react';
 import type { Match, Odds } from '@/lib/types';
 import { fetchWorldCupFixtures } from './openfootball';
 import {
@@ -21,7 +22,12 @@ import { listOdds } from '@/lib/odds/store';
  * - football-data 키가 있으면 실시간 상태/스코어가 포함된 데이터를 우선 사용.
  * - 키가 없거나 실패하면 openfootball 정적 일정으로 폴백.
  */
-export async function getMatches(): Promise<{
+// cache() 로 감싸 한 번의 요청(SSR) 안에서는 결과를 재사용한다.
+// 대부분의 페이지가 getMatches() 와 getOdds()(내부에서 다시 getMatches()) 를
+// 동시에 호출하므로, 이 dedup 으로 외부 파싱/매핑이 중복 실행되지 않는다.
+export const getMatches = cache(_getMatches);
+
+async function _getMatches(): Promise<{
   matches: Match[];
   source: string;
 }> {

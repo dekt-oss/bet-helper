@@ -8,6 +8,8 @@ export interface OddsTriple {
 }
 
 function formatKickoff(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '일정 미정';
   return new Intl.DateTimeFormat('ko-KR', {
     month: 'short',
     day: 'numeric',
@@ -15,7 +17,7 @@ function formatKickoff(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'Asia/Seoul',
-  }).format(new Date(iso));
+  }).format(d);
 }
 
 const statusText: Record<string, string> = {
