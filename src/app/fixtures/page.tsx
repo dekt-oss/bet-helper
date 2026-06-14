@@ -13,7 +13,11 @@ import type { Bet } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function FixturesPage() {
+export default async function FixturesPage({
+  searchParams,
+}: {
+  searchParams?: { match?: string };
+}) {
   const [{ matches, source }, { odds, api }, opinions] = await Promise.all([
     getMatches(),
     getOdds(),
@@ -59,6 +63,7 @@ export default async function FixturesPage() {
 
       <MatchBoard
         matches={matches}
+        initialOpenId={searchParams?.match}
         oddsByMatch={oddsByMatch}
         opinionsByMatch={opinionsByMatch}
         betsByMatch={betsByMatch}
