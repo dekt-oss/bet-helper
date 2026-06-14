@@ -50,7 +50,7 @@ export default async function FixturesPage() {
         <h1 style={{ marginBottom: 4 }}>경기·베팅</h1>
         <AutoRefresh />
       </div>
-      <p className="muted">
+      <p className="muted" style={{ fontSize: 11.5 }}>
         총 {matches.length}경기 · 배당 {api ? '자동(The Odds API)' : '수동 입력'} ·
         출처 {source} · 경기를 누르면 정보·3인 의견·베팅
       </p>

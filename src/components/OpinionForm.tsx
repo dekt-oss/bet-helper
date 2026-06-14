@@ -15,9 +15,18 @@ function SaveBtn() {
   const { pending } = useFormStatus();
   return (
     <button type="submit" className="opinion-save" disabled={pending}>
-      {pending ? '…' : '저장'}
+      {pending ? '저장중…' : '저장'}
     </button>
   );
+}
+
+// 저장 진행/완료 상태 텍스트(useFormStatus 는 form 내부에서만 동작).
+function SaveStatus({ ok, error }: { ok?: boolean; error?: string }) {
+  const { pending } = useFormStatus();
+  if (pending) return <span className="muted opinion-status">저장중입니다…</span>;
+  if (ok) return <span className="success opinion-status">✓ 저장됨</span>;
+  if (error) return <span className="error opinion-status">⚠ 실패</span>;
+  return null;
 }
 
 /** 한 멤버의 경기 의견(승/무/패 + 코멘트) 입력 행. advisory=참고인(합의 무영향). */
@@ -76,8 +85,7 @@ export function OpinionForm({
           className="opinion-comment"
         />
         <SaveBtn />
-        {state.ok && <span className="success">✓</span>}
-        {state.error && <span className="error">⚠</span>}
+        <SaveStatus ok={state.ok} error={state.error} />
       </form>
       {(current?.pick || current?.comment) && (
         <form action={deleteOpinionSimple}>

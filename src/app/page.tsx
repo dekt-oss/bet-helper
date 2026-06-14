@@ -73,7 +73,7 @@ export default async function DashboardPage() {
       <OddsHealthBanner odds={odds} matches={matches} />
 
       <div className="stat-grid">
-        <div className="card">
+        <div className="card primary">
           <div className="muted">현재 잔액</div>
           <div className="stat">{won(pool.balance)}</div>
           <div className="muted" style={{ fontSize: 12 }}>
@@ -97,18 +97,9 @@ export default async function DashboardPage() {
       </div>
 
       {/* 베팅내역 (최근) */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          marginTop: 32,
-        }}
-      >
-        <h2 style={{ margin: 0 }}>📋 최근 베팅내역</h2>
-        <Link href="/bets" className="muted" style={{ fontSize: 13 }}>
-          전체 보기 →
-        </Link>
+      <div className="section-head">
+        <h2>📋 최근 베팅내역</h2>
+        <Link href="/bets">전체 보기 →</Link>
       </div>
       {recentBets.length === 0 ? (
         <p className="muted">아직 베팅내역이 없습니다.</p>
@@ -128,12 +119,14 @@ export default async function DashboardPage() {
             <tbody>
               {recentBets.map((b) => (
                 <tr key={b.id}>
-                  <td>{matchKorName.get(b.matchId) ?? b.matchId}</td>
-                  <td>{pickLabel[b.pick] ?? b.pick}</td>
-                  <td>{b.oddsAtPlacement.toFixed(2)}</td>
-                  <td>{won(b.stake)}</td>
-                  <td>{statusLabel[b.status] ?? b.status}</td>
-                  <td>{b.payout != null ? won(b.payout) : '-'}</td>
+                  <td data-label="경기" className="cell-stack">
+                    {matchKorName.get(b.matchId) ?? b.matchId}
+                  </td>
+                  <td data-label="선택">{pickLabel[b.pick] ?? b.pick}</td>
+                  <td data-label="배당">{b.oddsAtPlacement.toFixed(2)}</td>
+                  <td data-label="금액">{won(b.stake)}</td>
+                  <td data-label="상태">{statusLabel[b.status] ?? b.status}</td>
+                  <td data-label="수령">{b.payout != null ? won(b.payout) : '-'}</td>
                 </tr>
               ))}
             </tbody>
