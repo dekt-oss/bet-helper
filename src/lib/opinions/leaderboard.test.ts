@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computePredictionLeaderboard, resultOf } from './leaderboard';
+import {
+  computePredictionLeaderboard,
+  computePredictionDetails,
+  resultOf,
+} from './leaderboard';
 import type { Match, Opinion, Outcome } from '@/lib/types';
 
 const MEMBERS = ['임준혁', '양준환', '전인우'];
@@ -67,4 +71,26 @@ test('참고인 플래그 표시', () => {
   const rows = computePredictionLeaderboard([], [], [...MEMBERS, ...ADVISORY], ADVISORY);
   assert.equal(rows.find((r) => r.member === '김민석')!.advisory, true);
   assert.equal(rows.find((r) => r.member === '임준혁')!.advisory, false);
+});
+
+test('경기별 예측 상세: 결과 있는 경기 먼저 + 적중 표시', () => {
+  const matches = [match('m1', 2, 0), match('m2', 1, 2, false)]; // m1 종료(HOME), m2 예정
+  const opinions = [
+    op('m1', '임준혁', 'HOME'), // 적중
+    op('m1', '양준환', 'DRAW'), // 실패
+    op('m2', '임준혁', 'AWAY'), // 결과 대기
+    op('m1', '없는사람', 'HOME'), // 멤버 밖 → 무시
+  ];
+  const details = computePredictionDetails(opinions, matches, MEMBERS, ADVISORY);
+  // 채점된 m1 이 먼저
+  assert.equal(details[0].matchId, 'm1');
+  assert.equal(details[0].result, 'HOME');
+  assert.equal(details[0].picks.length, 2); // 멤버 밖 픽 제외
+  assert.equal(details[0].picks[0].member, '임준혁');
+  assert.equal(details[0].picks[0].correct, true);
+  assert.equal(details[0].picks[1].correct, false);
+  // m2 는 결과 대기
+  assert.equal(details[1].matchId, 'm2');
+  assert.equal(details[1].result, null);
+  assert.equal(details[1].picks[0].correct, null);
 });

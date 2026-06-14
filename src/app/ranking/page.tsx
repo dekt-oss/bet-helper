@@ -2,14 +2,28 @@ import { getMatches } from '@/lib/data-sources';
 import { listOpinions } from '@/lib/opinions/store';
 import {
   computePredictionLeaderboard,
+  computePredictionDetails,
   resultOf,
 } from '@/lib/opinions/leaderboard';
 import { OPINION_MEMBERS, MEMBERS, ADVISORY_MEMBERS } from '@/lib/pool/config';
+import { toKoreanTeam } from '@/lib/teams/korea';
 import { AutoRefresh } from '@/components/AutoRefresh';
+import type { Outcome } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 const medal = ['🥇', '🥈', '🥉'];
+const pickLabel: Record<Outcome, string> = { HOME: '승', DRAW: '무', AWAY: '패' };
+
+function formatKickoff(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'Asia/Seoul',
+  }).format(d);
+}
 
 export default async function RankingPage() {
   const [{ matches }, opinions] = await Promise.all([
@@ -18,6 +32,13 @@ export default async function RankingPage() {
   ]);
 
   const rows = computePredictionLeaderboard(
+    opinions,
+    matches,
+    OPINION_MEMBERS,
+    ADVISORY_MEMBERS,
+  );
+
+  const details = computePredictionDetails(
     opinions,
     matches,
     OPINION_MEMBERS,
@@ -116,6 +137,70 @@ export default async function RankingPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {details.length > 0 && (
+        <>
+          <h2>경기별 예측</h2>
+          <p className="muted" style={{ fontSize: 12, marginTop: -4 }}>
+            누가 무엇을 예상했는지와 실제 결과입니다. (✅ 적중 · ❌ 빗나감 · 결과
+            전 경기는 표시 없음)
+          </p>
+          <div className="pred-list">
+            {details.map((d) => {
+              const home = toKoreanTeam(d.homeName);
+              const away = toKoreanTeam(d.awayName);
+              return (
+                <div className="pred-match card" key={d.matchId}>
+                  <div className="pred-match-head">
+                    <span className="pred-teams">
+                      {home} <span className="muted">vs</span> {away}
+                      <span className="muted" style={{ fontSize: 12 }}>
+                        {' '}
+                        · {formatKickoff(d.kickoff)}
+                      </span>
+                    </span>
+                    {d.result && d.score ? (
+                      <span className="pred-result-chip">
+                        결과 {d.score.home}:{d.score.away} ·{' '}
+                        {pickLabel[d.result]}
+                      </span>
+                    ) : (
+                      <span className="pred-result-chip pending">결과 대기</span>
+                    )}
+                  </div>
+                  <div className="pred-picks">
+                    {d.picks.map((p) => (
+                      <span
+                        key={p.member}
+                        className={`pred-pick ${
+                          p.correct === true
+                            ? 'ok'
+                            : p.correct === false
+                              ? 'no'
+                              : ''
+                        }`}
+                      >
+                        {p.member}
+                        {p.advisory && (
+                          <span className="muted" style={{ fontSize: 11 }}>
+                            (참고)
+                          </span>
+                        )}{' '}
+                        <b>{pickLabel[p.pick]}</b>
+                        {p.correct === true
+                          ? ' ✅'
+                          : p.correct === false
+                            ? ' ❌'
+                            : ''}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <p className="muted" style={{ fontSize: 12, marginTop: 14 }}>

@@ -26,8 +26,8 @@ export default function RootLayout({
               <Link href="/">대시보드</Link>
               <Link href="/fixtures">경기·베팅</Link>
               <Link href="/standings">조별순위</Link>
-              <Link href="/ranking">예측순위</Link>
               <Link href="/bets">베팅내역</Link>
+              <Link href="/ranking">예측순위</Link>
               <Link href="/pool">정산</Link>
             </nav>
           </div>

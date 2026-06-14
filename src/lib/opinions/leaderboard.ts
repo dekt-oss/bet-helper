@@ -76,3 +76,82 @@ export function computePredictionLeaderboard(
       a.member.localeCompare(b.member, 'ko'),
   );
 }
+
+// ── 경기별 예측 상세 ───────────────────────────────────────
+
+export interface MemberPick {
+  member: string;
+  advisory: boolean;
+  pick: Outcome;
+  /** 적중 여부. 결과가 아직 없으면 null. */
+  correct: boolean | null;
+}
+
+export interface MatchPrediction {
+  matchId: string;
+  homeName: string;
+  awayName: string;
+  kickoff: string;
+  status: Match['status'];
+  score?: { home: number; away: number };
+  /** 실제 결과(승/무/패). 종료+스코어 없으면 null. */
+  result: Outcome | null;
+  picks: MemberPick[];
+}
+
+/**
+ * "누가 뭘 예상했고 결과는 어땠는지"를 경기별로 정리한다.
+ * - 멤버 중 한 명이라도 픽을 낸 경기만 포함.
+ * - 정렬: 채점된(결과 있는) 경기 먼저 → 킥오프 늦은(최근) 순.
+ */
+export function computePredictionDetails(
+  opinions: Opinion[],
+  matches: Match[],
+  members: string[],
+  advisoryMembers: string[] = [],
+): MatchPrediction[] {
+  const advisory = new Set(advisoryMembers);
+  const order = new Map(members.map((m, i) => [m, i]));
+  const matchById = new Map(matches.map((m) => [m.id, m]));
+
+  // matchId → (member → pick)
+  const byMatch = new Map<string, MemberPick[]>();
+  for (const o of opinions) {
+    if (!o.pick) continue;
+    if (!order.has(o.member)) continue;
+    const m = matchById.get(o.matchId);
+    if (!m) continue; // 현재 경기 목록에 없는 의견은 무시
+    const result = m.status === 'FINISHED' ? resultOf(m) : null;
+    const list = byMatch.get(o.matchId) ?? [];
+    list.push({
+      member: o.member,
+      advisory: advisory.has(o.member),
+      pick: o.pick,
+      correct: result ? o.pick === result : null,
+    });
+    byMatch.set(o.matchId, list);
+  }
+
+  const out: MatchPrediction[] = [];
+  for (const [matchId, picks] of byMatch) {
+    const m = matchById.get(matchId)!;
+    picks.sort((a, b) => (order.get(a.member)! - order.get(b.member)!));
+    out.push({
+      matchId,
+      homeName: m.home.name,
+      awayName: m.away.name,
+      kickoff: m.kickoff,
+      status: m.status,
+      score: m.score,
+      result: m.status === 'FINISHED' ? resultOf(m) : null,
+      picks,
+    });
+  }
+
+  return out.sort((a, b) => {
+    const ag = a.result != null ? 0 : 1;
+    const bg = b.result != null ? 0 : 1;
+    return ag - bg || b.kickoff.localeCompare(a.kickoff);
+  });
+}
+
