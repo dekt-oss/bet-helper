@@ -62,14 +62,27 @@ function mergeLive(base: Match[], live: Match[]): Match[] {
   });
 }
 
-// worldcup26 라이브 보강(활성 시). 실패해도 기준 목록을 그대로 돌려준다.
+// worldcup26 보강은 best-effort 이며 절대 페이지를 느리게 해선 안 된다.
+//  - 단일 시도 상한 2.5초(Promise.race).
+//  - 실패 시 60초 쿨다운 → 죽어 있을 때 매 요청이 타임아웃을 무는 것을 방지.
+const ENRICH_TIMEOUT_MS = 2500;
+const ENRICH_COOLDOWN_MS = 60_000;
+let enrichCooldownUntil = 0;
+
 async function enrichWithLive(base: Match[]): Promise<Match[]> {
   if (!isWorldcup26Enabled()) return base;
+  if (Date.now() < enrichCooldownUntil) return base; // 최근 실패 → 잠시 건너뜀
   try {
-    const live = await fetchWorldcup26Matches();
+    const live = await Promise.race([
+      fetchWorldcup26Matches(),
+      new Promise<Match[]>((_, reject) =>
+        setTimeout(() => reject(new Error('worldcup26 보강 타임아웃')), ENRICH_TIMEOUT_MS),
+      ),
+    ]);
     return live.length > 0 ? mergeLive(base, live) : base;
   } catch (err) {
-    console.warn('[data] worldcup26 라이브 보강 실패(무시):', err);
+    enrichCooldownUntil = Date.now() + ENRICH_COOLDOWN_MS;
+    console.warn('[data] worldcup26 보강 건너뜀(쿨다운 60초):', err);
     return base;
   }
 }
