@@ -82,6 +82,7 @@ export async function fetchLiveWorldCupMatches(): Promise<Match[]> {
 
   return data.matches.map((m) => ({
     id: stableMatchId(m.homeTeam?.name, m.awayTeam?.name) ?? `fd-${m.id}`,
+    altIds: [`fd-${m.id}`], // 옛 ID 로 저장된 의견·배당 복구용 별칭
     competition: m.competition.name,
     stage: m.group ?? m.stage,
     kickoff: m.utcDate,

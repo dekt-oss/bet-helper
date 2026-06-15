@@ -300,6 +300,7 @@ function gameToMatch(g: WcGame, venues: Map<string, VenueInfo>): Match {
     id:
       stableMatchId(g.home_team_name_en, g.away_team_name_en) ??
       `wc2026-${g.id}`,
+    altIds: [`wc2026-${g.id}`], // 옛 ID 복구용 별칭
     competition: 'FIFA World Cup 2026',
     stage: mapStage(g.group, g.type),
     // 개최지별 시간대로 환산(없으면 기본 -360).

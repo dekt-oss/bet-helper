@@ -71,6 +71,8 @@ export async function fetchWorldCupFixtures(): Promise<Match[]> {
       id:
         stableMatchId(m.team1.name, m.team2.name) ??
         `wc2026-${m.num ?? `${m.date}-${m.team1.name}-${m.team2.name}`}`,
+      altIds:
+        m.num != null ? [`wc2026-${m.num}`] : undefined, // 옛 ID 복구용 별칭
       competition: data.name ?? 'FIFA World Cup 2026',
       stage: m.group ?? round,
       kickoff,

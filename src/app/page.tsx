@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getMatches, getOdds } from '@/lib/data-sources';
+import { getMatches, getOdds, resolveMatchIds } from '@/lib/data-sources';
 import { listBetsSettled } from '@/lib/bets/store';
 import { listOpinions } from '@/lib/opinions/store';
 import { computePredictionLeaderboard } from '@/lib/opinions/leaderboard';
@@ -35,8 +35,12 @@ export default async function DashboardPage() {
   const bets = await listBetsSettled(matches);
   const pool = computePoolBalance(bets);
 
-  // 예측왕 Top 3 (베팅과 무관한 의견 적중률).
-  const predTop = computePredictionLeaderboard(opinions, matches, OPINION_MEMBERS)
+  // 예측왕 Top 3 (베팅과 무관한 의견 적중률). 옛 ID 의견도 복구해 집계.
+  const predTop = computePredictionLeaderboard(
+    resolveMatchIds(opinions, matches),
+    matches,
+    OPINION_MEMBERS,
+  )
     .filter((r) => r.attempts > 0)
     .slice(0, 3);
 
