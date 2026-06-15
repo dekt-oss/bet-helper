@@ -15,6 +15,7 @@
 //     실데이터 확보 시 아래 상수만 교체하면 된다.
 
 import type { Match, Odds } from '@/lib/types';
+import { teamCanon } from '@/lib/teams/korea';
 
 // ── 설정 상수 (구조 변경 시 여기만 수정) ─────────────────────
 
@@ -364,7 +365,15 @@ async function parseBetmanHtml(html: string): Promise<Odds[]> {
 }
 
 function teamPairKey(a: string, b: string): string {
-  return [normalizeTeamName(a), normalizeTeamName(b)].sort().join('|');
+  // teamCanon(영문→한글 표준명)으로 먼저 통일한 뒤 정규화한다.
+  // 베트맨은 한글 팀명("브라질"), 경기 소스는 영문("Brazil")을 주므로
+  // 번역 없이는 매칭이 안 된다. teamCanon 이 양쪽을 같은 한글로 맞춰준다.
+  return [
+    normalizeTeamName(teamCanon(a)),
+    normalizeTeamName(teamCanon(b)),
+  ]
+    .sort()
+    .join('|');
 }
 
 function normalizeTeamName(name: string): string {
