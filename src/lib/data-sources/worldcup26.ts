@@ -19,13 +19,15 @@ const PASSWORD = process.env.WORLDCUP26_PASSWORD ?? 'BetHelper!wc2026';
 const NAME = process.env.WORLDCUP26_USERNAME ?? 'bet-helper';
 
 /**
- * worldcup26.ir 사용 여부 — 기본 OFF.
- * JWT 인증이 느리고 자주 실패해 페이지 지연·ID 불안정의 근원이었으므로,
- * 기본적으로 끄고 football-data 단일 기준으로 동작한다.
- * 득점자/경기장 보강이 꼭 필요할 때만 WORLDCUP26_ENABLED=true 로 켠다.
+ * worldcup26.ir 사용 여부 — 기본 ON(라이브 보강 전용).
+ * 과거 문제(ID 흔들림·페이지 지연)는 구조적으로 해결됨:
+ *  - ID/팀명 기준은 football-data 로 고정(worldcup26 는 ID 소스 아님) → 흔들림 없음.
+ *  - 보강 호출은 2.5초 상한 + 60초 쿨다운(index.enrichWithLive) → 느려지지 않음.
+ * 그래서 진행중 스코어·진행분·득점자 보강을 위해 기본 켜둔다.
+ * 완전히 끄려면 WORLDCUP26_DISABLED=true.
  */
 export function isWorldcup26Enabled(): boolean {
-  return process.env.WORLDCUP26_ENABLED === 'true';
+  return process.env.WORLDCUP26_DISABLED !== 'true';
 }
 
 // 일부 사이트는 기본 fetch UA 를 봇으로 보고 403 을 준다 → 브라우저처럼 위장.
