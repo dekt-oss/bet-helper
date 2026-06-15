@@ -37,8 +37,9 @@ export default async function FixturesPage({
       updatedAt: o.updatedAt,
     };
 
-  // 옛 ID 로 저장된 의견·베팅을 현재 경기 ID 로 복구해 표시.
-  const opinionsByMatch = groupByMatch(resolveMatchIds(opinions, matches));
+  // 의견은 옛(오염된) 데이터를 복구하지 않는다 — 깨끗한 상태에서 새로 시작.
+  // (옛 ID 로 저장된 의견은 표시되지 않음. 지금부터 입력하는 의견만 반영)
+  const opinionsByMatch = groupByMatch(opinions);
   const betsByMatch: Record<string, Bet[]> = {};
   for (const b of resolveMatchIds(bets, matches))
     (betsByMatch[b.matchId] ??= []).push(b);
