@@ -29,16 +29,17 @@ import { listOdds, upsertOdds } from '@/lib/odds/store';
  * 경기 목록을 가져온다.
  *
  * 안정성 우선 전략(불안정성 해결):
- * - "기준 데이터"(경기 목록·팀명·ID)는 항상 openfootball(공개·무인증)에서 가져온다.
- *   → 소스가 깜빡여도 ID·팀명이 바뀌지 않아, 저장한 의견·배당이 사라지지 않는다.
- * - worldcup26(JWT 인증, 간헐 실패)은 "라이브 정보"(상태·스코어·진행시간·득점자·경기장)
- *   만 stableMatchId 로 매칭해 덧입힌다. 실패하면 라이브 정보만 빠지고 목록은 유지된다.
- * - openfootball 이 비어 있을 때만(데이터 공백 방지) worldcup26/football-data 로 폴백.
+ * - "기준 데이터"(경기 목록·팀명·ID)는 신뢰할 수 있는 단일 소스에서 가져온다.
+ *   우선순위: football-data(키 보유 시·안정적) > openfootball(공개) > worldcup26.
+ *   → 소스가 깜빡여도 기준이 잘 안 바뀌어, 저장한 의견·배당이 사라지지 않는다.
+ *   (openfootball 은 2026 데이터가 비어 오는 경우가 있어 1순위에서 제외)
+ * - worldcup26(JWT 인증, 간헐 실패)은 "라이브 보강"(상태·스코어·진행시간·득점자·경기장)
+ *   만 stableMatchId 로 매칭해 덧입힌다(ID·팀명에는 영향 없음). 실패해도 기준은 유지.
  */
 // React cache(): 한 번의 요청(렌더) 안에서 중복 호출을 메모이즈한다.
 export const getMatches = cache(_getMatches);
 
-// worldcup26 라이브 필드를 openfootball 기준 경기에 덧입힌다(ID·팀명은 기준 유지).
+// worldcup26 라이브 필드를 기준 경기에 덧입힌다(ID·팀명은 기준 유지, best-effort).
 function mergeLive(base: Match[], live: Match[]): Match[] {
   const liveById = new Map(live.map((m) => [m.id, m]));
   return base.map((m) => {
@@ -46,57 +47,64 @@ function mergeLive(base: Match[], live: Match[]): Match[] {
     if (!lv) return m; // 매칭 안 되면 기준 그대로(라이브 정보만 없음)
     return {
       ...m,
-      status: lv.status,
+      // football-data 도 상태/스코어/분을 주므로, worldcup26 라이브가 더 진행됐을 때만 덮어쓴다.
+      status: lv.status !== 'SCHEDULED' ? lv.status : m.status,
       score: lv.score ?? m.score,
-      minute: lv.minute,
+      minute: lv.minute ?? m.minute,
       scorers: lv.scorers ?? m.scorers,
       venue: lv.venue ?? m.venue,
     };
   });
 }
 
+// worldcup26 라이브 보강(활성 시). 실패해도 기준 목록을 그대로 돌려준다.
+async function enrichWithLive(base: Match[]): Promise<Match[]> {
+  if (!isWorldcup26Enabled()) return base;
+  try {
+    const live = await fetchWorldcup26Matches();
+    return live.length > 0 ? mergeLive(base, live) : base;
+  } catch (err) {
+    console.warn('[data] worldcup26 라이브 보강 실패(무시):', err);
+    return base;
+  }
+}
+
 async function _getMatches(): Promise<{
   matches: Match[];
   source: string;
 }> {
-  // 기준: openfootball(안정적). 실패하면 base 는 빈 배열.
-  let base: Match[] = [];
+  // 1순위 안정 기준: football-data (키 보유 시). 무인증 worldcup26 보다 안정적이고
+  // 실제로 2026 경기 데이터를 안정적으로 제공한다.
+  if (isFootballDataConfigured()) {
+    try {
+      const base = await fetchLiveWorldCupMatches();
+      if (base.length > 0) {
+        const matches = await enrichWithLive(base);
+        return { matches, source: 'football-data' };
+      }
+    } catch (err) {
+      console.warn('[data] football-data 실패, 다음 소스로 폴백:', err);
+    }
+  }
+
+  // 2순위: openfootball(공개). 2026 데이터가 있으면 사용.
   try {
-    base = await fetchWorldCupFixtures();
+    const base = await fetchWorldCupFixtures();
+    if (base.length > 0) {
+      const matches = await enrichWithLive(base);
+      return { matches, source: 'openfootball' };
+    }
   } catch (err) {
     console.warn('[data] openfootball 실패:', err);
   }
 
-  if (base.length > 0) {
-    // 라이브 보강(worldcup26). 실패해도 기준 목록은 그대로 둔다.
-    if (isWorldcup26Enabled()) {
-      try {
-        const live = await fetchWorldcup26Matches();
-        if (live.length > 0) {
-          return { matches: mergeLive(base, live), source: 'openfootball+worldcup26' };
-        }
-      } catch (err) {
-        console.warn('[data] worldcup26 라이브 보강 실패(무시):', err);
-      }
-    }
-    return { matches: base, source: 'openfootball' };
-  }
-
-  // openfootball 이 비었을 때만 폴백(데이터 공백 방지).
+  // 3순위: worldcup26 단독(다른 소스가 모두 비었을 때만 — 깜빡임 위험 있어 최후순위).
   if (isWorldcup26Enabled()) {
     try {
       const matches = await fetchWorldcup26Matches();
       if (matches.length > 0) return { matches, source: 'worldcup26' };
     } catch (err) {
       console.warn('[data] worldcup26 폴백 실패:', err);
-    }
-  }
-  if (isFootballDataConfigured()) {
-    try {
-      const matches = await fetchLiveWorldCupMatches();
-      if (matches.length > 0) return { matches, source: 'football-data' };
-    } catch (err) {
-      console.warn('[data] football-data 폴백 실패:', err);
     }
   }
   return { matches: [], source: 'none' };
