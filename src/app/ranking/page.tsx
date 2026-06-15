@@ -1,4 +1,4 @@
-import { getMatches } from '@/lib/data-sources';
+import { getMatches, resolveMatchIds } from '@/lib/data-sources';
 import { listOpinions } from '@/lib/opinions/store';
 import {
   computePredictionLeaderboard,
@@ -13,10 +13,12 @@ export const dynamic = 'force-dynamic';
 const medal = ['🥇', '🥈', '🥉'];
 
 export default async function RankingPage() {
-  const [{ matches }, opinions] = await Promise.all([
+  const [{ matches }, opinionsRaw] = await Promise.all([
     getMatches(),
     listOpinions(),
   ]);
+  // 옛 ID 로 저장된 의견을 현재 경기 ID 로 복구.
+  const opinions = resolveMatchIds(opinionsRaw, matches);
 
   const rows = computePredictionLeaderboard(opinions, matches, OPINION_MEMBERS);
   const details = computePredictionDetails(

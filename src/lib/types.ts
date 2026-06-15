@@ -42,6 +42,11 @@ export interface Match {
   };
   /** 데이터를 어디서 가져왔는지 추적용 */
   source: DataSourceId;
+  /**
+   * 이 경기가 과거(다른 소스/구버전)에 가졌을 수 있는 ID들(별칭).
+   * 옛 ID 로 저장된 의견·배당을 현재 경기에 다시 연결(복구)하는 데 쓴다.
+   */
+  altIds?: string[];
 }
 
 export type Outcome = 'HOME' | 'DRAW' | 'AWAY';

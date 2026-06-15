@@ -24,6 +24,7 @@ import {
   isOddsApiConfigured,
 } from './theOddsApi';
 import { listOdds, upsertOdds } from '@/lib/odds/store';
+import { buildMatchIdResolver, resolveMatchIds } from './resolve';
 
 /**
  * 경기 목록을 가져온다.
@@ -53,6 +54,10 @@ function mergeLive(base: Match[], live: Match[]): Match[] {
       minute: lv.minute ?? m.minute,
       scorers: lv.scorers ?? m.scorers,
       venue: lv.venue ?? m.venue,
+      // 두 소스의 별칭 ID 를 합쳐, 어느 소스 시절에 저장한 데이터든 복구되게 한다.
+      altIds: Array.from(
+        new Set([...(m.altIds ?? []), ...(lv.altIds ?? []), lv.id]),
+      ),
     };
   });
 }
@@ -118,6 +123,9 @@ export async function getLiveMatches(): Promise<Match[]> {
   );
 }
 
+// 옛 ID 복구(remap) 유틸은 resolve.ts 로 분리(React/IO 의존 없음 → 테스트 가능).
+export { buildMatchIdResolver, resolveMatchIds };
+
 /**
  * 베트맨 승부식 배당을 가져온다.
  * 1순위: DB(odds 테이블) — 화면에서 입력한 베트맨 배당.
@@ -134,7 +142,11 @@ export const getOdds = cache(_getOdds);
 async function _getOdds(): Promise<OddsResult> {
   const scraper = isBetmanEnabled();
   const api = isOddsApiConfigured();
-  const [dbOdds, { matches }] = await Promise.all([listOdds(), getMatches()]);
+  const [dbOddsRaw, { matches }] = await Promise.all([listOdds(), getMatches()]);
+
+  // 옛/별칭 ID 로 저장된 배당을 현재 경기 ID 로 복구(remap).
+  // (소스 변경 전 저장돼 'fd-…','wc2026-…','betman-홈-원정' 등에 묶인 배당 복구)
+  const dbOdds = resolveMatchIds(dbOddsRaw, matches);
 
   // DB 배당을 (1) 수동/베트맨 입력 과 (2) 자동 배당 스냅샷('oddsapi') 으로 분리한다.
   //  - 수동 입력: 항상 최우선.

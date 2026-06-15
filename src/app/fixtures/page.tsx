@@ -1,4 +1,4 @@
-import { getMatches, getOdds } from '@/lib/data-sources';
+import { getMatches, getOdds, resolveMatchIds } from '@/lib/data-sources';
 import { type OddsTriple } from '@/components/BetForm';
 import { MatchBoard } from '@/components/MatchBoard';
 import { OddsForm } from '@/components/OddsForm';
@@ -37,9 +37,11 @@ export default async function FixturesPage({
       updatedAt: o.updatedAt,
     };
 
-  const opinionsByMatch = groupByMatch(opinions);
+  // 옛 ID 로 저장된 의견·베팅을 현재 경기 ID 로 복구해 표시.
+  const opinionsByMatch = groupByMatch(resolveMatchIds(opinions, matches));
   const betsByMatch: Record<string, Bet[]> = {};
-  for (const b of bets) (betsByMatch[b.matchId] ??= []).push(b);
+  for (const b of resolveMatchIds(bets, matches))
+    (betsByMatch[b.matchId] ??= []).push(b);
   const betOptions = buildMatchOptions(matches);
 
   return (
