@@ -75,6 +75,7 @@ const KOREAN: Record<string, string> = {
   honduras: '온두라스',
   jamaica: '자메이카',
   capeverde: '카보베르데',
+  capeverdeislands: '카보베르데', // football-data 표기
   curacao: '퀴라소',
   haiti: '아이티',
   iraq: '이라크',
