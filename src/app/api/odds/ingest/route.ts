@@ -29,14 +29,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { count } = await ingestBetmanRaw(raw);
-    if (count === 0) {
+    const { count, marketCount } = await ingestBetmanRaw(raw);
+    if (count === 0 && marketCount === 0) {
       return NextResponse.json(
-        { ok: false, error: '월드컵 승무패 배당을 찾지 못했습니다. gameSlip.do 응답이 맞는지 확인하세요.' },
+        { ok: false, error: '월드컵 배당을 찾지 못했습니다. gameSlip.do 응답이 맞는지 확인하세요.' },
         { status: 422 },
       );
     }
-    return NextResponse.json({ ok: true, count });
+    return NextResponse.json({ ok: true, count, marketCount });
   } catch (err) {
     console.error('[ingest] 저장 실패:', err);
     return NextResponse.json(

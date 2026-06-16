@@ -64,6 +64,41 @@ export interface Odds {
   source: DataSourceId;
 }
 
+// ── 멀티마켓 배당(승무패 + 핸디캡 + 언더오버) ─────────────────
+
+/** 베트맨 발매 마켓(게임유형). 승무패 / 핸디캡 / 언더오버. */
+export type MarketType = '1X2' | 'HANDICAP' | 'OU';
+
+/** 폴(전표 한 줄)의 선택지. 1X2·핸디캡은 HOME/DRAW/AWAY, 언더오버는 OVER/UNDER. */
+export type LegPick = 'HOME' | 'DRAW' | 'AWAY' | 'OVER' | 'UNDER';
+
+/**
+ * 한 경기-한 마켓의 배당. 베트맨 게임번호 1개에 대응.
+ *  - 1X2 / HANDICAP: home/draw/away 사용. HANDICAP 은 handicap(홈 기준 핸디)도 가짐.
+ *  - OU: line(기준선) + over/under 사용.
+ */
+export interface MarketOdds {
+  matchId: string;
+  market: MarketType;
+  /** 베트맨 게임번호(마켓 식별) */
+  betId?: string;
+  /** "홈|원정" 매칭 복구용 */
+  externalRef?: string;
+  // 승무패 & 핸디캡 (3-way)
+  home?: number;
+  draw?: number;
+  away?: number;
+  /** 홈 기준 핸디(HANDICAP 전용, 예: -1) */
+  handicap?: number;
+  // 언더오버
+  /** 합산 득점 기준선(OU 전용, 예: 2.5) */
+  line?: number;
+  over?: number;
+  under?: number;
+  updatedAt: string;
+  source: DataSourceId;
+}
+
 /** 경기별 멤버 의견(합의용). 3인이 같은 pick 이면 합의. */
 export interface Opinion {
   matchId: string;
@@ -101,6 +136,38 @@ export interface Bet {
   /** 베팅 금액 (원) */
   stake: number;
   status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  /** 적중 시 수령액 (원) — 정산 후 채워짐 */
+  payout?: number;
+  note?: string;
+  createdAt: string;
+}
+
+export type BetStatus = 'PENDING' | 'WON' | 'LOST' | 'VOID';
+
+/** 전표 한 줄(폴). 경기 1개 + 마켓 + 선택지. */
+export interface BetLeg {
+  matchId: string;
+  market: MarketType;
+  pick: LegPick;
+  /** 핸디(홈 기준) 또는 OU 기준선 — 정산·표기에 필요 */
+  line?: number;
+  /** 폴 배당(베팅 시점 고정) */
+  oddsAtPlacement: number;
+  status: BetStatus;
+}
+
+/**
+ * 구매전표. 폴 1개=단폴, 2+=조합(다폴).
+ * 총배당 = 각 폴 배당의 곱(환급 폴은 1로 취급).
+ */
+export interface BetSlip {
+  id: string;
+  placedBy: string;
+  legs: BetLeg[];
+  /** 베팅 시점 총배당(폴 배당 곱) */
+  combinedOdds: number;
+  stake: number;
+  status: BetStatus;
   /** 적중 시 수령액 (원) — 정산 후 채워짐 */
   payout?: number;
   note?: string;
