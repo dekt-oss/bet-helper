@@ -1,4 +1,4 @@
-import { getMatches, getOdds, resolveMatchIds } from '@/lib/data-sources';
+import { getMatches, getOdds, getMarketOdds, resolveMatchIds } from '@/lib/data-sources';
 import { type OddsTriple } from '@/components/BetForm';
 import { MatchBoard } from '@/components/MatchBoard';
 import { OddsForm } from '@/components/OddsForm';
@@ -9,7 +9,7 @@ import { getBetmanHeartbeat } from '@/lib/odds/status';
 import { buildMatchOptions } from '@/lib/teams/options';
 import { listOpinions, groupByMatch } from '@/lib/opinions/store';
 import { listBetsSettled } from '@/lib/bets/store';
-import { listMarketOdds, marketOddsByMatch } from '@/lib/odds/market-store';
+import { marketOddsByMatch } from '@/lib/odds/market-store';
 import { MEMBERS, OPINION_MEMBERS, ADVISORY_MEMBERS } from '@/lib/pool/config';
 import type { Bet, MarketOdds } from '@/lib/types';
 
@@ -24,7 +24,7 @@ export default async function FixturesPage({
     await Promise.all([
       getMatches(),
       getOdds(),
-      listMarketOdds(),
+      getMarketOdds(),
       listOpinions(),
       getBetmanHeartbeat(),
     ]);
