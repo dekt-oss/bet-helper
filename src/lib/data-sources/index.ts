@@ -2,7 +2,7 @@
 // 화면/ API 라우트는 개별 소스를 직접 부르지 말고 여기 함수만 사용한다.
 // 이렇게 하면 "무료 API → 유료 API → 정적 데이터" 폴백 전략을 한 곳에서 관리할 수 있다.
 
-import type { Match, Odds } from '@/lib/types';
+import type { Match, MarketOdds, Odds } from '@/lib/types';
 import { cache } from 'react';
 import { fetchWorldCupFixtures } from './openfootball';
 import {
@@ -20,10 +20,12 @@ import {
 } from './betman';
 import {
   fetchWorldCupOdds,
+  fetchWorldCupMarketOdds,
   fetchHistoricalWorldCupOdds,
   isOddsApiConfigured,
 } from './theOddsApi';
 import { listOdds, upsertOdds } from '@/lib/odds/store';
+import { listMarketOdds, marketKey } from '@/lib/odds/market-store';
 import { buildMatchIdResolver, resolveMatchIds } from './resolve';
 
 /**
@@ -212,6 +214,32 @@ async function _getOdds(): Promise<OddsResult> {
   const matchIds = new Set(matches.map((m) => m.id));
   const odds = [...map.values()].filter((o) => matchIds.has(o.matchId));
   return { odds, scraper, api };
+}
+
+// ── 멀티마켓 배당(승무패+핸디캡+언더오버) 집계 ───────────────
+// 우선순위: DB market_odds(베트맨/수동 실배당) > The Odds API(spreads=핸디/totals=언오 자동).
+//  - 같은 (경기,마켓,라인) 은 DB 실배당이 API 값을 덮어쓴다(베트맨 우선).
+export const getMarketOdds = cache(_getMarketOdds);
+
+async function _getMarketOdds(): Promise<MarketOdds[]> {
+  const [dbRaw, { matches }] = await Promise.all([listMarketOdds(), getMatches()]);
+  const db = resolveMatchIds(dbRaw, matches);
+  const map = new Map<string, MarketOdds>();
+  for (const o of db) map.set(marketKey(o), o);
+
+  if (isOddsApiConfigured()) {
+    try {
+      const api = matchOddsToMatches(await fetchWorldCupMarketOdds(matches), matches);
+      for (const o of api) {
+        const k = marketKey(o);
+        if (!map.has(k)) map.set(k, o); // DB(실배당)에 없을 때만 보강
+      }
+    } catch (err) {
+      console.warn('[data] The Odds API 마켓(스프레드/토탈) 실패(무시):', err);
+    }
+  }
+  const ids = new Set(matches.map((m) => m.id));
+  return [...map.values()].filter((o) => ids.has(o.matchId));
 }
 
 // 한 번의 렌더에서 과거 배당 호출 수 상한(과금/지연 방지).

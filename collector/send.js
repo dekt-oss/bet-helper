@@ -28,7 +28,10 @@ const res = await fetch(url, {
 const body = await res.json().catch(() => ({}));
 console.log('응답 HTTP', res.status, ':', JSON.stringify(body));
 if (res.ok && body.ok) {
-  console.log(`\n✅ ${body.count}경기 배당 저장됨. 구구뱃 화면(/, /odds)에서 확인하세요.`);
+  console.log(
+    `\n✅ 승무패 ${body.count}경기 · 전체 마켓 ${body.marketCount ?? body.count}행(승무패+핸디캡+언더오버) 저장됨.` +
+      `\n   marketCount 가 count 보다 크면 핸디/언오까지 수집된 것입니다. 구구뱃 /fixtures 에서 확인하세요.`,
+  );
 } else if (res.status === 422) {
   console.log('\n⚠️ 422 = 파싱 0건. 앱(브랜치)에 최신 파서가 배포됐는지 확인.');
 } else {

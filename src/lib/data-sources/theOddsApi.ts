@@ -4,7 +4,7 @@
 // 베트맨은 공식 API/스크래핑이 막혀(개발 환경 egress 차단 + 로그인/JS) 자동 수집이 불가하여,
 // 경기별 배당을 "자동으로" 채우려면 이런 배당 API 가 현실적 대안이다.
 
-import type { Match, Odds } from '@/lib/types';
+import type { Match, MarketOdds, Odds } from '@/lib/types';
 import { teamCanon } from '@/lib/teams/korea';
 import { fetchWithTimeout } from '@/lib/http';
 
@@ -17,6 +17,8 @@ export function isOddsApiConfigured(): boolean {
 interface OAOutcome {
   name: string;
   price: number;
+  /** spreads(핸디)·totals(언오)의 기준선. 예: -1.5, 2.5 */
+  point?: number;
 }
 interface OAEvent {
   home_team: string;
@@ -78,6 +80,94 @@ export async function fetchHistoricalWorldCupOdds(
   // 과거 응답은 { timestamp, data: OAEvent[] } 형태로 감싸여 온다.
   const body = (await res.json()) as { data?: OAEvent[] };
   return mapEventsToOdds(body.data ?? [], matches);
+}
+
+/**
+ * 핸디캡(spreads)·언더오버(totals) 마켓을 자동 수집해 MarketOdds[] 로 정규화한다.
+ * - 키가 없으면 빈 배열(베트맨 실배당 입력으로 폴백).
+ * - The Odds API spreads 는 2-way(홈/원정, 무 없음) → 핸디 HOME/AWAY 만 채운다.
+ *   (베트맨 정수핸디의 '무'는 실배당 입력 시에만 채워진다.)
+ * - 배당은 해외 북메이커 기준이라 베트맨 고정배당과 다르므로 source='oddsapi'(참고용).
+ */
+export async function fetchWorldCupMarketOdds(
+  matches: Match[],
+): Promise<MarketOdds[]> {
+  const key = process.env.THE_ODDS_API_KEY;
+  if (!key) return [];
+
+  const url =
+    `https://api.the-odds-api.com/v4/sports/${SPORT}/odds/` +
+    `?apiKey=${key}&regions=eu&markets=spreads,totals&oddsFormat=decimal`;
+  // 6시간 캐시(무료 키 보호) — h2h 호출과 별개의 1회.
+  const res = await fetchWithTimeout(url, { next: { revalidate: 21600 } });
+  const remaining = res.headers.get('x-requests-remaining');
+  if (remaining) console.info(`[the-odds-api/markets] 남은 호출: ${remaining}`);
+  if (!res.ok) throw new Error(`the-odds-api markets ${res.status}`);
+  const events = (await res.json()) as OAEvent[];
+  return mapEventsToMarketOdds(events, matches);
+}
+
+function mapEventsToMarketOdds(
+  events: OAEvent[],
+  matches: Match[],
+): MarketOdds[] {
+  const byPair = new Map<string, Match>();
+  for (const m of matches) byPair.set(pairKey(m.home.name, m.away.name), m);
+
+  const now = new Date().toISOString();
+  const out: MarketOdds[] = [];
+  const seen = new Set<string>(); // (matchId,market,line) 중복 방지(여러 북메이커)
+
+  for (const e of events) {
+    const match = byPair.get(pairKey(e.home_team, e.away_team));
+    const matchId = match ? match.id : `oddsapi-${pairKey(e.home_team, e.away_team)}`;
+    const externalRef = `${teamCanon(e.home_team)}|${teamCanon(e.away_team)}`;
+    const homeName = match ? match.home.name : e.home_team;
+    const awayName = match ? match.away.name : e.away_team;
+
+    for (const bk of e.bookmakers ?? []) {
+      for (const mk of bk.markets ?? []) {
+        if (mk.key === 'spreads') {
+          const homeO = mk.outcomes.find((x) => teamCanon(x.name) === teamCanon(homeName));
+          const awayO = mk.outcomes.find((x) => teamCanon(x.name) === teamCanon(awayName));
+          if (!homeO || !awayO || homeO.price <= 1 || awayO.price <= 1) continue;
+          const line = homeO.point ?? null;
+          const dedupe = `${matchId}|HANDICAP|${line ?? ''}`;
+          if (seen.has(dedupe)) continue;
+          seen.add(dedupe);
+          out.push({
+            matchId,
+            market: 'HANDICAP',
+            externalRef,
+            home: homeO.price,
+            away: awayO.price,
+            handicap: line ?? undefined,
+            updatedAt: now,
+            source: 'oddsapi',
+          });
+        } else if (mk.key === 'totals') {
+          const overO = mk.outcomes.find((x) => /over/i.test(x.name));
+          const underO = mk.outcomes.find((x) => /under/i.test(x.name));
+          if (!overO || !underO || overO.price <= 1 || underO.price <= 1) continue;
+          const line = overO.point ?? underO.point ?? null;
+          const dedupe = `${matchId}|OU|${line ?? ''}`;
+          if (seen.has(dedupe)) continue;
+          seen.add(dedupe);
+          out.push({
+            matchId,
+            market: 'OU',
+            externalRef,
+            line: line ?? undefined,
+            over: overO.price,
+            under: underO.price,
+            updatedAt: now,
+            source: 'oddsapi',
+          });
+        }
+      }
+    }
+  }
+  return out;
 }
 
 /** OAEvent[] → 우리 Odds[] 로 매핑(라이브/과거 공통). */
