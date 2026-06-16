@@ -1,4 +1,4 @@
-import { listBetsSettled } from '@/lib/bets/store';
+import { listSlipsUnified } from '@/lib/bets/slip-store';
 import { getMatches } from '@/lib/data-sources';
 import { computePoolBalance, computePerPerson } from '@/lib/pool/balance';
 import { POOL } from '@/lib/pool/config';
@@ -16,8 +16,8 @@ function signed(n: number) {
 
 export default async function PoolPage() {
   const { matches } = await getMatches();
-  const bets = await listBetsSettled(matches);
-  const pool = computePoolBalance(bets);
+  const slips = await listSlipsUnified(matches);
+  const pool = computePoolBalance(slips);
   const per = computePerPerson(pool);
   const profitColor = pool.profit >= 0 ? 'var(--accent)' : 'var(--live)';
 

@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
 import { RealtimeBets } from '@/components/RealtimeBets';
+import { SlipProvider } from '@/components/slip/SlipProvider';
+import { SlipPanel } from '@/components/slip/SlipPanel';
 
 export const metadata: Metadata = {
   title: '구구뱃 — 월드컵 공동 베팅 관리',
@@ -32,7 +34,10 @@ export default function RootLayout({
             </nav>
           </div>
         </header>
-        <main className="container">{children}</main>
+        <SlipProvider>
+          <main className="container">{children}</main>
+          <SlipPanel />
+        </SlipProvider>
         <RealtimeBets />
       </body>
     </html>

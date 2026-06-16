@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getMatches, getOdds } from '@/lib/data-sources';
-import { listBetsSettled } from '@/lib/bets/store';
+import { listSlipsUnified } from '@/lib/bets/slip-store';
 import { listOpinions } from '@/lib/opinions/store';
 import { computePredictionLeaderboard } from '@/lib/opinions/leaderboard';
 import { computePoolBalance } from '@/lib/pool/balance';
@@ -17,7 +17,13 @@ function won(n: number) {
   return `${n.toLocaleString('ko-KR')}원`;
 }
 
-const pickLabel: Record<string, string> = { HOME: '승', DRAW: '무', AWAY: '패' };
+const pickLabel: Record<string, string> = {
+  HOME: '승',
+  DRAW: '무',
+  AWAY: '패',
+  OVER: '오버',
+  UNDER: '언더',
+};
 const statusLabel: Record<string, string> = {
   PENDING: '대기',
   WON: '적중',
@@ -32,8 +38,8 @@ export default async function DashboardPage() {
     getBetmanHeartbeat(),
     listOpinions(),
   ]);
-  const bets = await listBetsSettled(matches);
-  const pool = computePoolBalance(bets);
+  const slips = await listSlipsUnified(matches);
+  const pool = computePoolBalance(slips);
 
   // 예측왕 Top 3 (베팅과 무관한 의견 적중률). 의견은 옛 데이터 복구 없이 현재 것만.
   const predTop = computePredictionLeaderboard(opinions, matches, OPINION_MEMBERS)
@@ -61,7 +67,22 @@ export default async function DashboardPage() {
     .filter((m) => !isKoreaMatch(m))
     .sort((a, b) => a.kickoff.localeCompare(b.kickoff))
     .slice(0, 5);
-  const recentBets = bets.slice(0, 5);
+  const recentBets = slips.slice(0, 5);
+
+  // 전표 구성 요약(단폴: 경기+선택, 다폴: "N폴 조합").
+  function slipSummary(s: (typeof slips)[number]): string {
+    if (s.legs.length >= 2) return `${s.legs.length}폴 조합`;
+    const leg = s.legs[0];
+    if (!leg) return '-';
+    return matchKorName.get(leg.matchId) ?? leg.matchId;
+  }
+  function slipPick(s: (typeof slips)[number]): string {
+    if (s.legs.length >= 2) return '조합';
+    const leg = s.legs[0];
+    if (!leg) return '-';
+    const label = pickLabel[leg.pick] ?? leg.pick;
+    return leg.line != null ? `${label} ${leg.line}` : label;
+  }
 
   return (
     <>
@@ -159,16 +180,16 @@ export default async function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {recentBets.map((b) => (
-                <tr key={b.id}>
+              {recentBets.map((s) => (
+                <tr key={s.id}>
                   <td data-label="경기" className="cell-stack">
-                    {matchKorName.get(b.matchId) ?? b.matchId}
+                    {slipSummary(s)}
                   </td>
-                  <td data-label="선택">{pickLabel[b.pick] ?? b.pick}</td>
-                  <td data-label="배당">{b.oddsAtPlacement.toFixed(2)}</td>
-                  <td data-label="금액">{won(b.stake)}</td>
-                  <td data-label="상태">{statusLabel[b.status] ?? b.status}</td>
-                  <td data-label="수령">{b.payout != null ? won(b.payout) : '-'}</td>
+                  <td data-label="선택">{slipPick(s)}</td>
+                  <td data-label="배당">{s.combinedOdds.toFixed(2)}</td>
+                  <td data-label="금액">{won(s.stake)}</td>
+                  <td data-label="상태">{statusLabel[s.status] ?? s.status}</td>
+                  <td data-label="수령">{s.payout != null ? won(s.payout) : '-'}</td>
                 </tr>
               ))}
             </tbody>

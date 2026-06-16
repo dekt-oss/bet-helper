@@ -1,9 +1,9 @@
-import { listBetsSettled, summarize } from '@/lib/bets/store';
+import { listSlipsUnified, summarizeSlips } from '@/lib/bets/slip-store';
 import { getMatches } from '@/lib/data-sources';
-import { DeleteBet } from '@/components/DeleteBet';
+import { DeleteSlip } from '@/components/DeleteSlip';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { toKoreanTeam } from '@/lib/teams/korea';
-import type { Match, Outcome } from '@/lib/types';
+import type { BetLeg, Match } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,12 +13,19 @@ const statusLabel: Record<string, string> = {
   LOST: '미적중',
   VOID: '무효',
 };
+const marketLabel: Record<string, string> = {
+  '1X2': '승무패',
+  HANDICAP: '핸디캡',
+  OU: '언더오버',
+};
+
+const ACCENT = 'var(--accent)';
+const RED = 'var(--live)';
 
 function won(n: number) {
   return `${n.toLocaleString('ko-KR')}원`;
 }
 
-// 베팅 등록 시각(createdAt) — 한국시간 컴팩트.
 function fmtWhen(iso: string): string {
   return new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul',
@@ -29,69 +36,46 @@ function fmtWhen(iso: string): string {
     hour12: false,
   }).format(new Date(iso));
 }
-// 경기 일자/시간 — 한국시간.
-function fmtMatch(iso: string): string {
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(iso));
+
+function statusColor(status: string): string | undefined {
+  if (status === 'WON') return ACCENT;
+  if (status === 'LOST') return RED;
+  return undefined;
 }
 
-function pickText(pick: Outcome, home: string, away: string): string {
-  if (pick === 'HOME') return `${home} 승`;
-  if (pick === 'AWAY') return `${away} 승`;
-  return '무승부';
+function fmtLine(n: number): string {
+  return n > 0 ? `+${n}` : `${n}`;
 }
-
-function scoreOutcome(s: { home: number; away: number }): Outcome {
-  if (s.home > s.away) return 'HOME';
-  if (s.home < s.away) return 'AWAY';
-  return 'DRAW';
-}
-
-const ACCENT = 'var(--accent)';
-const RED = 'var(--live)';
 
 export default async function BetsPage() {
   const { matches } = await getMatches();
-  // 종료된 경기의 PENDING 베팅은 결과대로 자동 정산.
-  const bets = await listBetsSettled(matches);
-  const stats = summarize(bets);
-
+  const slips = await listSlipsUnified(matches);
+  const stats = summarizeSlips(slips);
   const matchById = new Map<string, Match>(matches.map((m) => [m.id, m]));
 
-  // 베팅 한 건의 표시용 상태/수령(경기 진행상황 반영) 계산.
-  function rowView(b: (typeof bets)[number]) {
-    const m = matchById.get(b.matchId);
-    const live = m?.status === 'LIVE' || m?.status === 'PAUSED';
-    const finished = m?.status === 'FINISHED';
-    const expected = Math.round(b.stake * b.oddsAtPlacement);
+  function teamsOf(matchId: string): { home: string; away: string; label: string } {
+    const m = matchById.get(matchId);
+    if (!m) return { home: '', away: '', label: matchId };
+    const home = toKoreanTeam(m.home.name);
+    const away = toKoreanTeam(m.away.name);
+    return { home, away, label: `${home} vs ${away}` };
+  }
 
-    if (live && m?.score) {
-      const hit = scoreOutcome(m.score) === b.pick;
-      return {
-        status: `경기중 ${m.score.home}:${m.score.away} · ${hit ? '적중 예상' : '미적중 예상'}`,
-        color: hit ? ACCENT : RED,
-        payout: hit ? `(예상) ${won(expected)}` : '-',
-      };
+  // 폴 한 줄의 선택 표시(경기 · 마켓 · 선택).
+  function legText(leg: BetLeg): { match: string; pick: string } {
+    const { home, away, label } = teamsOf(leg.matchId);
+    let pick: string;
+    if (leg.market === 'OU') {
+      pick = `${leg.pick === 'OVER' ? '오버' : '언더'} ${leg.line ?? ''}`.trim();
+    } else {
+      const base =
+        leg.pick === 'HOME' ? `${home} 승` : leg.pick === 'AWAY' ? `${away} 승` : '무승부';
+      pick =
+        leg.market === 'HANDICAP' && leg.line != null
+          ? `${base} (${fmtLine(leg.line)})`
+          : base;
     }
-    if (live) return { status: '경기중', color: undefined, payout: '-' };
-    if (finished || b.status === 'WON' || b.status === 'LOST' || b.status === 'VOID') {
-      const color =
-        b.status === 'WON' ? ACCENT : b.status === 'LOST' ? RED : undefined;
-      return {
-        status: statusLabel[b.status] ?? b.status,
-        color,
-        payout: b.payout != null ? won(b.payout) : '-',
-      };
-    }
-    // 아직 시작 전
-    return { status: '경기전', color: undefined, payout: '-' };
+    return { match: label, pick: `[${marketLabel[leg.market] ?? leg.market}] ${pick}` };
   }
 
   return (
@@ -111,13 +95,13 @@ export default async function BetsPage() {
       <p className="muted">
         총 {stats.count}건 · 베팅액 {won(stats.totalStake)} · 수령{' '}
         {won(stats.totalPayout)} · 손익{' '}
-        <strong style={{ color: stats.profit >= 0 ? 'var(--accent)' : 'var(--live)' }}>
+        <strong style={{ color: stats.profit >= 0 ? ACCENT : RED }}>
           {stats.profit >= 0 ? '+' : ''}
           {won(stats.profit)}
         </strong>
       </p>
 
-      {bets.length === 0 ? (
+      {slips.length === 0 ? (
         <p className="muted">아직 등록된 베팅이 없습니다.</p>
       ) : (
         <div className="card table-wrap">
@@ -125,9 +109,8 @@ export default async function BetsPage() {
             <thead>
               <tr>
                 <th>베팅일시</th>
-                <th>경기 (일시)</th>
-                <th>선택</th>
-                <th>배당</th>
+                <th>구성</th>
+                <th>총배당</th>
                 <th>금액</th>
                 <th>상태</th>
                 <th>수령</th>
@@ -135,34 +118,58 @@ export default async function BetsPage() {
               </tr>
             </thead>
             <tbody>
-              {bets.map((b) => {
-                const m = matchById.get(b.matchId);
-                const homeKor = m ? toKoreanTeam(m.home.name) : '';
-                const awayKor = m ? toKoreanTeam(m.away.name) : '';
-                const label = m ? `${homeKor} vs ${awayKor}` : b.matchId;
-                const v = rowView(b);
+              {slips.map((s) => {
+                const multi = s.legs.length >= 2;
+                const first = s.legs[0] ? legText(s.legs[0]) : { match: '', pick: '' };
                 return (
-                  <tr key={b.id}>
+                  <tr key={s.id}>
                     <td data-label="베팅일시" className="muted" style={{ whiteSpace: 'nowrap' }}>
-                      {fmtWhen(b.createdAt)}
+                      {fmtWhen(s.createdAt)}
                     </td>
-                    <td data-label="경기" className="cell-stack">
-                      {label}
-                      {m && (
-                        <div className="muted" style={{ fontSize: 11 }}>
-                          {fmtMatch(m.kickoff)}
-                        </div>
+                    <td data-label="구성" className="cell-stack">
+                      {multi ? (
+                        <details>
+                          <summary>
+                            <b>{s.legs.length}폴 조합</b>{' '}
+                            <span className="muted" style={{ fontSize: 12 }}>
+                              (펼치기)
+                            </span>
+                          </summary>
+                          <div style={{ marginTop: 6, display: 'grid', gap: 4 }}>
+                            {s.legs.map((leg, i) => {
+                              const lt = legText(leg);
+                              return (
+                                <div key={i} style={{ fontSize: 12.5 }}>
+                                  <span>{lt.match}</span>{' '}
+                                  <span className="muted">· {lt.pick}</span>{' '}
+                                  <b>{leg.oddsAtPlacement.toFixed(2)}</b>{' '}
+                                  <span style={{ color: statusColor(leg.status) }}>
+                                    {statusLabel[leg.status] ?? leg.status}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </details>
+                      ) : (
+                        <>
+                          {first.match}
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            {first.pick}
+                          </div>
+                        </>
                       )}
                     </td>
-                    <td data-label="선택">{m ? pickText(b.pick, homeKor, awayKor) : b.pick}</td>
-                    <td data-label="배당">{b.oddsAtPlacement.toFixed(2)}</td>
-                    <td data-label="금액">{won(b.stake)}</td>
-                    <td data-label="상태" style={{ color: v.color, whiteSpace: 'nowrap' }}>
-                      {v.status}
+                    <td data-label="총배당">{s.combinedOdds.toFixed(2)}</td>
+                    <td data-label="금액">{won(s.stake)}</td>
+                    <td data-label="상태" style={{ color: statusColor(s.status), whiteSpace: 'nowrap' }}>
+                      {statusLabel[s.status] ?? s.status}
                     </td>
-                    <td data-label="수령" style={{ whiteSpace: 'nowrap' }}>{v.payout}</td>
+                    <td data-label="수령" style={{ whiteSpace: 'nowrap' }}>
+                      {s.payout != null ? won(s.payout) : '-'}
+                    </td>
                     <td data-label="">
-                      <DeleteBet id={b.id} />
+                      <DeleteSlip id={s.id} legacyBetId={s.legacyBetId} />
                     </td>
                   </tr>
                 );

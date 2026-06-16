@@ -9,8 +9,9 @@ import { getBetmanHeartbeat } from '@/lib/odds/status';
 import { buildMatchOptions } from '@/lib/teams/options';
 import { listOpinions, groupByMatch } from '@/lib/opinions/store';
 import { listBetsSettled } from '@/lib/bets/store';
+import { listMarketOdds, marketOddsByMatch } from '@/lib/odds/market-store';
 import { MEMBERS, OPINION_MEMBERS, ADVISORY_MEMBERS } from '@/lib/pool/config';
-import type { Bet } from '@/lib/types';
+import type { Bet, MarketOdds } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +20,14 @@ export default async function FixturesPage({
 }: {
   searchParams?: { match?: string };
 }) {
-  const [{ matches, source }, { odds, api }, opinions, heartbeat] = await Promise.all([
-    getMatches(),
-    getOdds(),
-    listOpinions(),
-    getBetmanHeartbeat(),
-  ]);
+  const [{ matches, source }, { odds, api }, marketOddsRaw, opinions, heartbeat] =
+    await Promise.all([
+      getMatches(),
+      getOdds(),
+      listMarketOdds(),
+      listOpinions(),
+      getBetmanHeartbeat(),
+    ]);
   const bets = await listBetsSettled(matches);
 
   const oddsByMatch: Record<string, OddsTriple> = {};
@@ -36,6 +39,26 @@ export default async function FixturesPage({
       source: o.source,
       updatedAt: o.updatedAt,
     };
+
+  // 멀티마켓 배당(핸디캡·언더오버 포함). 옛/별칭 ID 는 현재 경기로 복구.
+  const marketOdds = resolveMatchIds(marketOddsRaw, matches);
+  const marketsByMatch = marketOddsByMatch(marketOdds);
+  // 폴백: market_odds 에 1X2 가 아직 없으면 기존 odds(승무패)로 채워 항상 표시.
+  for (const o of odds) {
+    const list = (marketsByMatch[o.matchId] ??= []);
+    if (!list.some((mo) => mo.market === '1X2')) {
+      const synthetic: MarketOdds = {
+        matchId: o.matchId,
+        market: '1X2',
+        home: o.home,
+        draw: o.draw,
+        away: o.away,
+        updatedAt: o.updatedAt,
+        source: o.source,
+      };
+      list.unshift(synthetic);
+    }
+  }
 
   // 의견은 옛(오염된) 데이터를 복구하지 않는다 — 깨끗한 상태에서 새로 시작.
   // (옛 ID 로 저장된 의견은 표시되지 않음. 지금부터 입력하는 의견만 반영)
@@ -70,9 +93,9 @@ export default async function FixturesPage({
         matches={matches}
         initialOpenId={searchParams?.match}
         oddsByMatch={oddsByMatch}
+        marketsByMatch={marketsByMatch}
         opinionsByMatch={opinionsByMatch}
         betsByMatch={betsByMatch}
-        betOptions={betOptions}
         consensusMembers={MEMBERS}
         opinionMembers={OPINION_MEMBERS}
         advisoryMembers={ADVISORY_MEMBERS}

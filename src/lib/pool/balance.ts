@@ -6,8 +6,15 @@
 // 대기(PENDING) 베팅은 돈이 이미 나간 상태이므로 잔액에서 빠진다(잠긴 금액).
 // 적중/무효로 수령액이 들어오면 다시 더해진다.
 
-import type { Bet } from '@/lib/types';
+import type { BetStatus } from '@/lib/types';
 import { INITIAL_CAPITAL, POOL } from './config';
+
+/** 잔액 계산에 필요한 최소 형태 — 단일 Bet 과 전표(BetSlip) 모두 만족. */
+export interface StakeItem {
+  stake: number;
+  payout?: number;
+  status: BetStatus;
+}
 
 export interface PoolBalance {
   initial: number; // 초기 자본
@@ -22,7 +29,7 @@ export interface PoolBalance {
   roi: number; // 수익률 (손익 / 초기자본)
 }
 
-export function computePoolBalance(bets: Bet[]): PoolBalance {
+export function computePoolBalance(bets: StakeItem[]): PoolBalance {
   const staked = bets.reduce((s, b) => s + b.stake, 0);
   const returned = bets.reduce((s, b) => s + (b.payout ?? 0), 0);
   const locked = bets
