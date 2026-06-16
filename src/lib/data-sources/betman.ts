@@ -192,15 +192,16 @@ export async function parseBetmanOdds(raw: string): Promise<Odds[]> {
   }
 }
 
-// 마켓별 추가 필드 후보 키(구조 변경 시 여기만 수정).
-// ⚠️ 핸디 기준선/언더오버 기준선·배당 컬럼명은 실데이터 확보 전 "추정값"이다.
-//    실응답을 캡처하면 아래 후보 배열에 실제 키를 추가(앞쪽 우선)하면 된다.
+// 마켓별 추가 필드 후보 키(구조 변경 시 여기만 수정). 앞에서부터 우선 탐색.
+// ✅ 'handi' 는 실데이터에서 확인된 기준선 컬럼이다(collector/inspect.js 가 이 컬럼을 읽음).
+//    베트맨 proto 는 핸디캡·언더오버 모두 'handi' 에 기준선을 둔다(핸디 정수 / U/O 기준점).
+//    나머지 후보는 구조 변형 대비 폴백. 새 실응답에서 다른 키가 보이면 앞에 추가하면 된다.
 const MARKET_FIELDS = {
   // 핸디캡 기준선(홈 기준 정수, 예: -1)
-  handicap: ['handicapScore', 'wdlScore', 'hdcScore', 'handicap', 'hdScore', 'hd'],
-  // 언더오버 기준선(예: 2.5)
-  ouLine: ['ouScore', 'uoScore', 'baseScore', 'stdScore', 'ouStdScore', 'line'],
-  // 언더오버 오버/언더 배당(없으면 winAllot=오버, loseAllot=언더 로 폴백)
+  handicap: ['handi', 'handicapScore', 'wdlScore', 'hdcScore', 'handicap'],
+  // 언더오버 기준선(예: 2.5) — 베트맨은 동일 'handi' 컬럼 재사용
+  ouLine: ['handi', 'ouScore', 'uoScore', 'baseScore', 'stdScore', 'line'],
+  // 언더오버 오버/언더 배당 — 베트맨은 별도 컬럼 없이 winAllot=오버, loseAllot=언더 재사용.
   over: ['overAllot', 'ovrAllot', 'uoOverAllot', 'ouOverAllot'],
   under: ['underAllot', 'udrAllot', 'uoUnderAllot', 'ouUnderAllot'],
 } as const;
