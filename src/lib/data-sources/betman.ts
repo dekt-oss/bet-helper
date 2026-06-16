@@ -14,7 +14,7 @@
 //  4) 실제 베트맨 응답 구조를 확보하기 전까지 필드/셀렉터는 "추정값"이며,
 //     실데이터 확보 시 아래 상수만 교체하면 된다.
 
-import type { Match, Odds } from '@/lib/types';
+import type { Match, MarketOdds, MarketType, Odds } from '@/lib/types';
 import { teamCanon } from '@/lib/teams/korea';
 
 // ── 설정 상수 (구조 변경 시 여기만 수정) ─────────────────────
@@ -192,13 +192,56 @@ export async function parseBetmanOdds(raw: string): Promise<Odds[]> {
   }
 }
 
+// 마켓별 추가 필드 후보 키(구조 변경 시 여기만 수정). 앞에서부터 우선 탐색.
+// ✅ 'handi' 는 실데이터에서 확인된 기준선 컬럼이다(collector/inspect.js 가 이 컬럼을 읽음).
+//    베트맨 proto 는 핸디캡·언더오버 모두 'handi' 에 기준선을 둔다(핸디 정수 / U/O 기준점).
+//    나머지 후보는 구조 변형 대비 폴백. 새 실응답에서 다른 키가 보이면 앞에 추가하면 된다.
+const MARKET_FIELDS = {
+  // 핸디캡 기준선(홈 기준 정수, 예: -1)
+  handicap: ['handi', 'handicapScore', 'wdlScore', 'hdcScore', 'handicap'],
+  // 언더오버 기준선(예: 2.5) — 베트맨은 동일 'handi' 컬럼 재사용
+  ouLine: ['handi', 'ouScore', 'uoScore', 'baseScore', 'stdScore', 'line'],
+  // 언더오버 오버/언더 배당 — 베트맨은 별도 컬럼 없이 winAllot=오버, loseAllot=언더 재사용.
+  over: ['overAllot', 'ovrAllot', 'uoOverAllot', 'ouOverAllot'],
+  under: ['underAllot', 'udrAllot', 'uoUnderAllot', 'ouUnderAllot'],
+} as const;
+
+/** betTypNm(게임유형명)을 우리 MarketType 으로 분류. 모르는 유형은 null(버림). */
+function classifyMarket(betTypNm: string): MarketType | null {
+  if (betTypNm === '승무패') return '1X2';
+  if (betTypNm.includes('핸디')) return 'HANDICAP';
+  if (
+    betTypNm.includes('언더오버') ||
+    betTypNm.includes('오버언더') ||
+    betTypNm.includes('U/O')
+  )
+    return 'OU';
+  return null;
+}
+
+/** keys 배열에서 후보 키들 중 처음 발견되는 인덱스(없으면 -1). */
+function firstIndex(keys: string[], candidates: readonly string[]): number {
+  for (const c of candidates) {
+    const i = keys.indexOf(c);
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
+/** 부호 있는 숫자(핸디/기준선용). parseOdd 와 달리 음수·0 허용. */
+function parseSigned(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : parseFloat(String(value ?? ''));
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
- * 베트맨 gameSlip.do 응답(compSchedules.keys/datas)을 파싱한다.
- * 축구 월드컵 "승무패"(1X2) 행만 골라 Odds 로 변환한다.
- *  winAllot=홈 승, drawAllot=무, loseAllot=원정 승(=홈 패).
+ * 베트맨 gameSlip.do 응답(compSchedules.keys/datas)을 파싱해 전 마켓을 추출한다.
+ * 축구 월드컵의 승무패(1X2)·핸디캡·언더오버 정규시간 행을 MarketOdds 로 변환한다.
+ *  - 1X2/HANDICAP: winAllot=승, drawAllot=무, loseAllot=패. HANDICAP 은 핸디 기준선도 가짐.
+ *  - OU: over/under 배당 + 기준선(line).
  * 어떤 입력에도 throw 하지 않는다(실패 시 []).
  */
-export function parseBetmanGameSlip(raw: string): Odds[] {
+export function parseBetmanMarkets(raw: string): MarketOdds[] {
   let json: unknown;
   try {
     json = JSON.parse(raw);
@@ -220,48 +263,100 @@ export function parseBetmanGameSlip(raw: string): Odds[] {
   const iDraw = idx('drawAllot');
   const iLose = idx('loseAllot');
   const iBet = idx('betTypNm');
-  const iBetId = idx('betId'); // betId='1' = 정규시간 승무패('118'=전반 승무패 등 제외)
+  const iBetId = idx('betId'); // 1X2 는 betId='1'(정규시간)만, '118'(전반 승무패) 등 제외
+  const iHd = firstIndex(keys, MARKET_FIELDS.handicap);
+  const iOuLine = firstIndex(keys, MARKET_FIELDS.ouLine);
+  const iOver = firstIndex(keys, MARKET_FIELDS.over);
+  const iUnder = firstIndex(keys, MARKET_FIELDS.under);
   if (iHome < 0 || iWin < 0 || iLose < 0) return [];
 
   const now = new Date().toISOString();
-  const out: Odds[] = [];
+  const out: MarketOdds[] = [];
   for (const row of cs.datas as unknown[][]) {
     if (iItem >= 0 && row[iItem] !== 'SC') continue; // 축구만
-    if (iBet >= 0 && row[iBet] !== '승무패') continue; // 1X2 마켓만(핸디캡 등 제외)
-    if (iBetId >= 0 && String(row[iBetId]) !== '1') continue; // 정규시간만(전반 승무패 제외)
     if (iLeague >= 0 && !String(row[iLeague] ?? '').includes('월드컵')) continue;
+
+    const betTyp = iBet >= 0 ? (str(row[iBet]) ?? '') : '승무패';
+    if (betTyp.includes('전반')) continue; // 정규시간만(전반전 마켓 제외)
+    const market = classifyMarket(betTyp);
+    if (!market) continue;
+    // 1X2 는 정규시간(betId='1')만. 핸디/언오는 유형별 betId 가 달라 필터하지 않는다.
+    if (market === '1X2' && iBetId >= 0 && String(row[iBetId]) !== '1') continue;
 
     const home = str(row[iHome]);
     const away = str(row[iAway]);
+    if (!home || !away) continue;
+
+    const base = {
+      matchId: `betman-${home}-${away}`,
+      externalRef: `${home}|${away}`,
+      betId: iBetId >= 0 ? str(row[iBetId]) : undefined,
+      market,
+      updatedAt: now,
+      source: 'betman' as const,
+    };
+
+    if (market === 'OU') {
+      const over = iOver >= 0 ? parseOdd(row[iOver]) : parseOdd(row[iWin]);
+      const under = iUnder >= 0 ? parseOdd(row[iUnder]) : parseOdd(row[iLose]);
+      if (over == null || under == null) continue;
+      const line = iOuLine >= 0 ? parseSigned(row[iOuLine]) : null;
+      out.push({ ...base, line: line ?? undefined, over, under });
+      continue;
+    }
+
+    // 1X2 / HANDICAP — 3-way
     const w = parseOdd(row[iWin]);
     const d = iDraw >= 0 ? parseOdd(row[iDraw]) : null;
     const l = parseOdd(row[iLose]);
-    if (w == null || d == null || l == null || !home || !away) continue;
-
-    out.push({
-      matchId: `betman-${home}-${away}`,
-      externalRef: `${home}|${away}`,
-      home: w,
-      draw: d,
-      away: l,
-      updatedAt: now,
-      source: 'betman',
-    });
+    if (w == null || l == null) continue;
+    const o: MarketOdds = { ...base, home: w, draw: d ?? undefined, away: l };
+    if (market === 'HANDICAP' && iHd >= 0) {
+      const h = parseSigned(row[iHd]);
+      if (h != null) o.handicap = h;
+    }
+    out.push(o);
   }
   return out;
 }
 
 /**
- * 베트맨 배당(Odds[])을 우리 경기 목록(Match[])과 팀명 기준으로 매칭한다.
- * 매칭되면 odds.matchId 를 해당 Match.id 로 보정한다. 순수 함수.
+ * 하위호환: 승무패(1X2)만 골라 옛 Odds 형태로 반환.
+ * 기존 ingest(/api/odds)·테스트가 이 시그니처에 의존한다.
  */
-export function matchOddsToMatches(odds: Odds[], matches: Match[]): Odds[] {
+export function parseBetmanGameSlip(raw: string): Odds[] {
+  return parseBetmanMarkets(raw)
+    .filter(
+      (o) =>
+        o.market === '1X2' &&
+        o.home != null &&
+        o.draw != null &&
+        o.away != null,
+    )
+    .map((o) => ({
+      matchId: o.matchId,
+      externalRef: o.externalRef,
+      home: o.home as number,
+      draw: o.draw as number,
+      away: o.away as number,
+      updatedAt: o.updatedAt,
+      source: o.source,
+    }));
+}
+
+/**
+ * 베트맨 배당을 우리 경기 목록(Match[])과 팀명 기준으로 매칭한다.
+ * externalRef("홈|원정")로 팀쌍을 찾아 matchId 를 해당 Match.id 로 보정한다. 순수 함수.
+ * Odds / MarketOdds 모두에 동작(제네릭).
+ */
+export function matchOddsToMatches<
+  T extends { externalRef?: string; matchId: string },
+>(odds: T[], matches: Match[]): T[] {
   const index = new Map<string, string>(); // 정렬된 팀쌍 키 → matchId
   for (const m of matches) {
     index.set(teamPairKey(m.home.name, m.away.name), m.id);
   }
   return odds.map((o) => {
-    // externalRef 에 "홈|원정" 원문이 보존돼 있다고 가정(rowToOdds 에서 기록)
     const [home, away] = (o.externalRef ?? '').split('|');
     const matchId = index.get(teamPairKey(home ?? '', away ?? ''));
     return matchId ? { ...o, matchId } : o;

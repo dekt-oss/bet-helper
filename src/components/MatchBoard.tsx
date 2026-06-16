@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import type { Match, Outcome, Opinion, Bet } from '@/lib/types';
-import { BetForm, type OddsTriple } from '@/components/BetForm';
+import type { Match, Outcome, Opinion, Bet, MarketOdds, LegPick } from '@/lib/types';
+import type { OddsTriple } from '@/components/BetForm';
 import { OpinionForm } from '@/components/OpinionForm';
+import { useSlip } from '@/components/slip/SlipProvider';
+import { MarketCells } from '@/components/slip/MarketCells';
 import { teamInfo } from '@/lib/teams/info-2026';
 import { consensus } from '@/lib/opinions/consensus';
-import type { MatchOption } from '@/lib/teams/options';
 import {
   toKoreanTeam,
   isKoreaMatch,
@@ -97,9 +96,9 @@ export function MatchBoard({
   matches,
   initialOpenId,
   oddsByMatch,
+  marketsByMatch,
   opinionsByMatch,
   betsByMatch,
-  betOptions,
   consensusMembers,
   opinionMembers,
   advisoryMembers,
@@ -107,20 +106,19 @@ export function MatchBoard({
   matches: Match[];
   initialOpenId?: string;
   oddsByMatch: Record<string, OddsTriple>;
+  marketsByMatch?: Record<string, MarketOdds[]>;
   opinionsByMatch: Record<string, Opinion[]>;
   betsByMatch: Record<string, Bet[]>;
-  betOptions: MatchOption[];
   consensusMembers: string[];
   opinionMembers: string[];
   advisoryMembers: string[];
 }) {
-  const router = useRouter();
+  const slip = useSlip();
   const [sort, setSort] = useState<SortKey>('korea');
   const [filter, setFilter] = useState<string>('all');
   // 기본값: 예정/진행중만 보기(끝난 경기는 체크 해제 시 표시).
   const [onlyUpcoming, setOnlyUpcoming] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [betPick, setBetPick] = useState<Outcome | undefined>(undefined);
   const [editOps, setEditOps] = useState(false);
 
   // 의견/베팅 저장 시 서버 액션 revalidate 로 컴포넌트가 다시 마운트되면 열린 카드가
@@ -181,14 +179,32 @@ export function MatchBoard({
     });
   }, [matches, sort, filter, onlyUpcoming]);
 
-  function openCard(id: string, pick?: Outcome) {
-    if (openId === id && pick === undefined) {
+  function openCard(id: string) {
+    if (openId === id) {
       setOpenId(null);
     } else {
       setOpenId(id);
-      setBetPick(pick);
       setEditOps(false);
     }
+  }
+
+  // 1X2 배당 셀 → 구매 슬립에 담기(한 경기당 1폴, 재클릭 토글).
+  function addOneX2(
+    m: Match,
+    home: string,
+    away: string,
+    pick: LegPick,
+    odds: number,
+  ) {
+    const pickLabel = pick === 'HOME' ? `${home} 승` : pick === 'AWAY' ? `${away} 승` : '무승부';
+    slip.toggle({
+      matchId: m.id,
+      matchLabel: `${home} vs ${away}`,
+      market: '1X2',
+      pick,
+      pickLabel,
+      odds,
+    });
   }
 
   return (
@@ -244,6 +260,7 @@ export function MatchBoard({
             (o) => o.pick || o.comment,
           ).length;
           const myBets = betsByMatch[m.id] ?? [];
+          const slipLeg = slip.legOf(m.id);
 
           const buttons: { key: Outcome; label: string; value: number }[] = t
             ? [
@@ -307,9 +324,12 @@ export function MatchBoard({
                           key={p.key}
                           type="button"
                           className={`odds-pick-btn ${p.key.toLowerCase()} ${
-                            isOpen && betPick === p.key ? 'active' : ''
+                            slipLeg?.market === '1X2' && slipLeg.pick === p.key
+                              ? 'active'
+                              : ''
                           }`}
-                          onClick={() => openCard(m.id, p.key)}
+                          onClick={() => addOneX2(m, home, away, p.key, p.value)}
+                          title="구매 슬립에 담기"
                         >
                           <span className="k">{p.label}</span>
                           <b>{p.value.toFixed(2)}</b>
@@ -476,9 +496,9 @@ export function MatchBoard({
                     </div>
                   )}
 
-                  {/* 베팅 또는 결과 */}
+                  {/* 베팅(마켓 선택) 또는 결과 */}
                   <div className="detail-block">
-                    <h4>{bettable ? '베팅 등록' : '결과'}</h4>
+                    <h4>{bettable ? '베팅 (마켓 선택)' : '결과'}</h4>
                     {bettable ? (
                       <>
                         {con.status === 'incomplete' && (
@@ -492,24 +512,17 @@ export function MatchBoard({
                             ⚠ 3인 의견이 갈렸습니다(미합치). 합의 후 베팅을 권장합니다.
                           </p>
                         )}
-                        <BetForm
-                          matches={betOptions}
-                          oddsByMatch={oddsByMatch}
-                          initialMatchId={m.id}
-                          initialPick={betPick}
-                          embedded
-                          onSuccess={() => {
-                            setOpenId(null);
-                            router.refresh();
-                          }}
+                        <MarketCells
+                          matchId={m.id}
+                          matchLabel={`${home} vs ${away}`}
+                          home={home}
+                          away={away}
+                          markets={marketsByMatch?.[m.id] ?? []}
                         />
-                        <Link
-                          href={`/bets?match=${encodeURIComponent(m.id)}`}
-                          className="muted"
-                          style={{ fontSize: 13 }}
-                        >
-                          베팅내역 탭에서 열기 →
-                        </Link>
+                        <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                          🧾 담은 항목은 화면 우하단 <b>구매 슬립</b>에서 금액 입력 후
+                          구매하세요. 여러 경기를 담으면 <b>조합(다폴)</b>으로 총배당이 곱해집니다.
+                        </p>
                       </>
                     ) : (
                       <p className="muted">

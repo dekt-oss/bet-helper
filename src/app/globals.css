@@ -1161,3 +1161,191 @@ tbody tr:last-child td {
   border-color: rgba(255, 77, 79, 0.45);
   background: rgba(255, 77, 79, 0.1);
 }
+
+/* ── 멀티마켓 셀(승무패/핸디캡/언더오버) ───────────────────── */
+.mkt-wrap {
+  display: grid;
+  gap: 10px;
+}
+.mkt-group {
+  display: grid;
+  gap: 4px;
+}
+.mkt-title {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.mkt-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.mkt-row:has(.mkt-cell:nth-child(2):last-child) {
+  grid-template-columns: repeat(2, 1fr);
+}
+.mkt-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  line-height: 1.2;
+}
+.mkt-cell .mkt-cell-k {
+  font-size: 11px;
+  color: var(--muted);
+}
+.mkt-cell b {
+  font-size: 14px;
+  color: var(--accent);
+}
+.mkt-cell.active {
+  border-color: var(--accent);
+  background: rgba(61, 220, 132, 0.14);
+}
+
+/* ── 구매 슬립(장바구니) 패널 ─────────────────────────────── */
+.slip-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  background: var(--accent);
+  color: #0b1f14;
+  border-color: var(--accent);
+  font-weight: 700;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.slip-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(72vh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.slip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.slip-count {
+  display: inline-block;
+  min-width: 18px;
+  text-align: center;
+  padding: 0 6px;
+  margin-left: 4px;
+  background: var(--accent);
+  color: #0b1f14;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.slip-x {
+  padding: 2px 8px;
+  font-size: 13px;
+}
+.slip-empty {
+  padding: 16px 12px;
+  font-size: 13px;
+}
+.slip-legs {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+}
+.slip-leg {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.slip-leg-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.slip-leg-match {
+  font-size: 13px;
+  font-weight: 600;
+}
+.slip-leg-pick {
+  font-size: 12px;
+  color: var(--muted);
+}
+.slip-leg-pick b {
+  color: var(--accent);
+}
+.slip-leg-market {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 5px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 10.5px;
+}
+.slip-leg-del {
+  padding: 2px 7px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.slip-summary {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+.slip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.slip-combined {
+  font-size: 18px;
+  color: var(--accent);
+}
+.slip-form {
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+}
+.slip-stake-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.slip-expected {
+  font-size: 13px;
+}
+.slip-expected b {
+  color: var(--accent);
+}
+.slip-actions {
+  display: flex;
+  gap: 8px;
+}
+.slip-buy {
+  flex: 1;
+}

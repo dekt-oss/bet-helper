@@ -9,6 +9,7 @@ import {
   parseBetmanOdds,
   matchOddsToMatches,
   parseBetmanGameSlip,
+  parseBetmanMarkets,
 } from './betman';
 import type { Match } from '@/lib/types';
 
@@ -90,4 +91,78 @@ test('parseBetmanGameSlip: 축구 월드컵 승무패만 추출하고 승/무/�
 test('parseBetmanGameSlip: 잘못된 입력은 [] 반환', () => {
   assert.deepEqual(parseBetmanGameSlip('not json'), []);
   assert.deepEqual(parseBetmanGameSlip('{}'), []);
+});
+
+test('parseBetmanMarkets: 승무패·핸디캡·언더오버를 마켓별로 추출', () => {
+  const sample = {
+    compSchedules: {
+      keys: [
+        'itemCode', 'leagueName', 'homeName', 'awayName',
+        'winAllot', 'drawAllot', 'loseAllot', 'betTypNm', 'betId',
+        'handicapScore', 'ouScore',
+      ],
+      datas: [
+        ['SC', '축구 월드컵', '브라질', '모로코', 1.62, 3.4, 5.0, '승무패', '1', null, null],
+        ['SC', '축구 월드컵', '브라질', '모로코', 2.31, 3.6, 2.35, '일반 정수핸디캡', '5', -1, null],
+        ['SC', '축구 월드컵', '브라질', '모로코', 1.95, null, 1.85, '언더오버', '8', null, 2.5],
+        ['SC', '축구 월드컵', '브라질', '모로코', 1.9, 3.5, 1.9, '전반 승무패', '118', null, null],
+        ['BS', 'MLB', '볼티모어', '샌디에이고', 1.58, 0, 1.99, '일반 승패', '2', null, null],
+      ],
+    },
+  };
+  const odds = parseBetmanMarkets(JSON.stringify(sample));
+  // 1X2 + 핸디캡 + 언더오버 = 3행 (전반·야구 제외)
+  assert.equal(odds.length, 3);
+
+  const x2 = odds.find((o) => o.market === '1X2');
+  assert.ok(x2);
+  assert.equal(x2.home, 1.62);
+  assert.equal(x2.draw, 3.4);
+  assert.equal(x2.away, 5.0);
+
+  const hd = odds.find((o) => o.market === 'HANDICAP');
+  assert.ok(hd);
+  assert.equal(hd.handicap, -1);
+  assert.equal(hd.home, 2.31);
+
+  const ou = odds.find((o) => o.market === 'OU');
+  assert.ok(ou);
+  assert.equal(ou.line, 2.5);
+  assert.equal(ou.over, 1.95); // winAllot 폴백
+  assert.equal(ou.under, 1.85); // loseAllot 폴백
+});
+
+test('parseBetmanMarkets: 실데이터 컬럼명(handi)으로 핸디·언오 기준선을 읽는다', () => {
+  // 베트맨 실응답은 핸디캡·언더오버 기준선을 모두 'handi' 컬럼에 둔다.
+  const sample = {
+    compSchedules: {
+      keys: ['itemCode', 'leagueName', 'homeName', 'awayName', 'winAllot', 'drawAllot', 'loseAllot', 'betTypNm', 'betId', 'handi'],
+      datas: [
+        ['SC', '축구 월드컵', '브라질', '모로코', 2.31, 3.6, 2.35, '일반 정수핸디캡', '5', -1],
+        ['SC', '축구 월드컵', '브라질', '모로코', 1.95, null, 1.85, '언더오버', '8', 2.5],
+      ],
+    },
+  };
+  const odds = parseBetmanMarkets(JSON.stringify(sample));
+  const hd = odds.find((o) => o.market === 'HANDICAP');
+  assert.equal(hd?.handicap, -1);
+  const ou = odds.find((o) => o.market === 'OU');
+  assert.equal(ou?.line, 2.5);
+  assert.equal(ou?.over, 1.95);
+  assert.equal(ou?.under, 1.85);
+});
+
+test('parseBetmanGameSlip: 멀티마켓 입력에서도 승무패만 골라낸다', () => {
+  const sample = {
+    compSchedules: {
+      keys: ['itemCode', 'leagueName', 'homeName', 'awayName', 'winAllot', 'drawAllot', 'loseAllot', 'betTypNm', 'betId'],
+      datas: [
+        ['SC', '축구 월드컵', '브라질', '모로코', 1.62, 3.4, 5.0, '승무패', '1'],
+        ['SC', '축구 월드컵', '브라질', '모로코', 2.31, 3.6, 2.35, '일반 정수핸디캡', '5'],
+      ],
+    },
+  };
+  const odds = parseBetmanGameSlip(JSON.stringify(sample));
+  assert.equal(odds.length, 1);
+  assert.equal(odds[0].home, 1.62);
 });
