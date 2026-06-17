@@ -89,11 +89,13 @@ export function settleSlip(
 
   const legStatuses = slip.legs.map((leg) => settleLeg(leg, get(leg.matchId)));
 
-  if (legStatuses.some((s) => s === 'PENDING')) {
-    return { status: 'PENDING', payout: null, legStatuses };
-  }
+  // 한 폴이라도 낙첨이면 나머지 경기가 안 끝났어도 전체 낙첨(조합 베팅 규칙).
   if (legStatuses.some((s) => s === 'LOST')) {
     return { status: 'LOST', payout: 0, legStatuses };
+  }
+  // 낙첨이 없고 아직 안 끝난 폴이 있으면 대기.
+  if (legStatuses.some((s) => s === 'PENDING')) {
+    return { status: 'PENDING', payout: null, legStatuses };
   }
   if (legStatuses.every((s) => s === 'VOID')) {
     return { status: 'VOID', payout: slip.stake, legStatuses };

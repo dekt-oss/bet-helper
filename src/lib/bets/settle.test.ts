@@ -94,6 +94,19 @@ test('settleSlip: 미종료 폴이 있으면 PENDING', () => {
   assert.equal(r.payout, null);
 });
 
+test('settleSlip: 먼저 끝난 폴이 낙첨이면 나머지 대기여도 전체 낙첨', () => {
+  const slip = {
+    stake: 10000,
+    legs: [leg({ matchId: 'a', pick: 'AWAY' }), leg({ matchId: 'b' })],
+  };
+  // a 는 종료(홈승)인데 픽이 AWAY → 낙첨. b 는 미종료.
+  const r = settleSlip(slip, { a: { home: 1, away: 0 } });
+  assert.equal(r.status, 'LOST');
+  assert.equal(r.payout, 0);
+  assert.equal(r.legStatuses[0], 'LOST');
+  assert.equal(r.legStatuses[1], 'PENDING');
+});
+
 test('settleSlip: 전 폴 환급이면 VOID(원금 반환)', () => {
   const slip = {
     stake: 10000,
