@@ -4,6 +4,7 @@ import { DeleteSlip } from '@/components/DeleteSlip';
 import { EditSlipOdds } from '@/components/EditSlipOdds';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { toKoreanTeam } from '@/lib/teams/korea';
+import { settleLeg } from '@/lib/bets/settle';
 import type { BetLeg, Match } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -79,6 +80,34 @@ export default async function BetsPage() {
     return { match: label, pick: `[${marketLabel[leg.market] ?? leg.market}] ${pick}` };
   }
 
+  // 폴 한 줄의 경기 결과(스코어)와 적중 여부 — 경기가 끝나면(또는 진행중이면) 실시간 계산.
+  function legResult(leg: BetLeg): { score: string; label: string; color?: string } {
+    const m = matchById.get(leg.matchId);
+    if (!m) return { score: '', label: '' };
+    const live = m.status === 'LIVE' || m.status === 'PAUSED';
+    const finished = m.status === 'FINISHED';
+    if (!m.score) return { score: live ? '경기중' : '경기전', label: '' };
+    const r = settleLeg({ market: leg.market, pick: leg.pick, line: leg.line }, m.score);
+    const score = `${finished ? '' : '경기중 '}${m.score.home}:${m.score.away}`;
+    const label = finished
+      ? r === 'WON'
+        ? '적중'
+        : r === 'LOST'
+          ? '미적중'
+          : r === 'VOID'
+            ? '환급'
+            : ''
+      : r === 'WON'
+        ? '적중예상'
+        : r === 'LOST'
+          ? '미적중예상'
+          : r === 'VOID'
+            ? '환급'
+            : '';
+    const color = r === 'WON' ? ACCENT : r === 'LOST' ? RED : undefined;
+    return { score, label, color };
+  }
+
   return (
     <>
       <div
@@ -139,14 +168,19 @@ export default async function BetsPage() {
                           <div style={{ marginTop: 6, display: 'grid', gap: 4 }}>
                             {s.legs.map((leg, i) => {
                               const lt = legText(leg);
+                              const rr = legResult(leg);
                               return (
                                 <div key={i} style={{ fontSize: 12.5 }}>
                                   <span>{lt.match}</span>{' '}
                                   <span className="muted">· {lt.pick}</span>{' '}
-                                  <b>{leg.oddsAtPlacement.toFixed(2)}</b>{' '}
-                                  <span style={{ color: statusColor(leg.status) }}>
-                                    {statusLabel[leg.status] ?? leg.status}
-                                  </span>
+                                  <b>{leg.oddsAtPlacement.toFixed(2)}</b>
+                                  {rr.score && (
+                                    <span style={{ color: rr.color }}>
+                                      {' · '}
+                                      {rr.score}
+                                      {rr.label ? ` ${rr.label}` : ''}
+                                    </span>
+                                  )}
                                 </div>
                               );
                             })}
@@ -158,6 +192,16 @@ export default async function BetsPage() {
                           <div className="muted" style={{ fontSize: 12 }}>
                             {first.pick}
                           </div>
+                          {s.legs[0] &&
+                            (() => {
+                              const rr = legResult(s.legs[0]);
+                              return rr.score ? (
+                                <div style={{ fontSize: 12, color: rr.color }}>
+                                  {rr.score}
+                                  {rr.label ? ` · ${rr.label}` : ''}
+                                </div>
+                              ) : null;
+                            })()}
                         </>
                       )}
                     </td>
