@@ -1,6 +1,7 @@
 import { listSlipsUnified, summarizeSlips } from '@/lib/bets/slip-store';
 import { getMatches } from '@/lib/data-sources';
 import { DeleteSlip } from '@/components/DeleteSlip';
+import { EditSlipOdds } from '@/components/EditSlipOdds';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import { toKoreanTeam } from '@/lib/teams/korea';
 import type { BetLeg, Match } from '@/lib/types';
@@ -169,7 +170,17 @@ export default async function BetsPage() {
                       {s.payout != null ? won(s.payout) : '-'}
                     </td>
                     <td data-label="">
-                      <DeleteSlip id={s.id} legacyBetId={s.legacyBetId} />
+                      <div className="row-actions">
+                        <EditSlipOdds
+                          id={s.id}
+                          legacyBetId={s.legacyBetId}
+                          legs={s.legs.map((leg) => {
+                            const lt = legText(leg);
+                            return { label: `${lt.match} · ${lt.pick}`, odds: leg.oddsAtPlacement };
+                          })}
+                        />
+                        <DeleteSlip id={s.id} legacyBetId={s.legacyBetId} />
+                      </div>
                     </td>
                   </tr>
                 );

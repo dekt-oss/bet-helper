@@ -172,6 +172,8 @@ async function sbUpdateBet(
   if (patch.status !== undefined) row.status = patch.status;
   if (patch.payout !== undefined) row.payout = patch.payout;
   if (patch.note !== undefined) row.note = patch.note;
+  if (patch.oddsAtPlacement !== undefined)
+    row.odds_at_placement = patch.oddsAtPlacement;
   const { data, error } = await sb
     .from('bets')
     .update(row)

@@ -61,6 +61,51 @@ export async function addSlip(input: NewSlip): Promise<BetSlip> {
   return slip;
 }
 
+/** 현재 폴 상태 기준으로 전표 수령액 재계산(배당 수정 시 사용). */
+function recomputePayout(slip: BetSlip): number | undefined {
+  if (slip.status === 'PENDING') return undefined;
+  if (slip.status === 'VOID') return slip.stake;
+  if (slip.status === 'LOST') return 0;
+  // WON: 적중 폴 배당만 곱한다(환급/대기 폴 제외).
+  const eff = slip.legs.reduce(
+    (p, l) => (l.status === 'WON' ? p * l.oddsAtPlacement : p),
+    1,
+  );
+  return Math.round(slip.stake * eff);
+}
+
+/**
+ * 전표 폴들의 배당을 수정하고 총배당·수령액을 재계산한다.
+ * oddsByIndex[i] 가 0보다 큰 유효 숫자면 i번째 폴 배당을 교체한다.
+ */
+export async function updateSlipOdds(
+  id: string,
+  oddsByIndex: (number | null | undefined)[],
+): Promise<BetSlip | null> {
+  const slips = await listSlips();
+  const slip = slips.find((s) => s.id === id);
+  if (!slip) return null;
+  const legs = slip.legs.map((l, i) => {
+    const v = oddsByIndex[i];
+    return typeof v === 'number' && Number.isFinite(v) && v > 0
+      ? { ...l, oddsAtPlacement: v }
+      : l;
+  });
+  const next: BetSlip = { ...slip, legs, combinedOdds: combinedOdds(legs) };
+  next.payout = recomputePayout(next);
+
+  if (isSupabaseConfigured()) {
+    try {
+      await sbUpdateSlipFull(next);
+      return next;
+    } catch (err) {
+      console.error('[slip] Supabase 배당수정 실패 → 파일 폴백:', err);
+    }
+  }
+  await fileUpdateSlip(next);
+  return next;
+}
+
 export async function deleteSlip(id: string): Promise<boolean> {
   if (isSupabaseConfigured()) {
     try {
@@ -265,6 +310,24 @@ async function sbUpdateSlip(slip: BetSlip): Promise<void> {
       .eq('slip_id', slip.id)
       .eq('leg_index', i);
     if (error) throw new Error(`supabase updateLeg: ${error.message}`);
+  }
+}
+
+/** 전표 배당 수정 영속화: 총배당·수령액 + 각 폴 배당. */
+async function sbUpdateSlipFull(slip: BetSlip): Promise<void> {
+  const sb = getSupabaseServer()!;
+  const { error: e1 } = await sb
+    .from('bet_slips')
+    .update({ combined_odds: slip.combinedOdds, payout: slip.payout ?? null })
+    .eq('id', slip.id);
+  if (e1) throw new Error(`supabase updateSlipFull: ${e1.message}`);
+  for (let i = 0; i < slip.legs.length; i += 1) {
+    const { error } = await sb
+      .from('bet_legs')
+      .update({ odds_at_placement: slip.legs[i].oddsAtPlacement })
+      .eq('slip_id', slip.id)
+      .eq('leg_index', i);
+    if (error) throw new Error(`supabase updateLegOdds: ${error.message}`);
   }
 }
 
