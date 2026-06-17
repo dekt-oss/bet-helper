@@ -330,6 +330,23 @@ button.danger:hover {
   border-color: var(--live);
   background: rgba(255, 77, 79, 0.12);
 }
+button.ghost {
+  background: transparent;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+/* 배팅내역 행 액션(배당 수정 + 삭제) */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.edit-odds {
+  display: inline-block;
+  min-width: 180px;
+}
 
 .form-grid {
   display: grid;

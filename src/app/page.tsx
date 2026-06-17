@@ -60,12 +60,22 @@ export default async function DashboardPage() {
   const live = sortKoreaFirst(
     matches.filter((m) => m.status === 'LIVE' || m.status === 'PAUSED'),
   );
+  // 우리가 베팅한 경기 id 집합(전표 폴 기준) — 다가오는 경기에서 최우선 노출.
+  const bettedMatchIds = new Set(
+    slips.flatMap((s) => s.legs.map((l) => l.matchId)),
+  );
+
   // 한국 경기를 최우선으로, 나머지는 다가오는 경기로.
   const scheduled = matches.filter((m) => m.status === 'SCHEDULED');
   const koreaUpcoming = sortKoreaFirst(scheduled.filter(isKoreaMatch)).slice(0, 5);
+  // 다가오는 경기: 베팅한 경기를 먼저, 그다음 킥오프 순.
   const upcoming = scheduled
     .filter((m) => !isKoreaMatch(m))
-    .sort((a, b) => a.kickoff.localeCompare(b.kickoff))
+    .sort((a, b) => {
+      const ba = bettedMatchIds.has(a.id) ? 0 : 1;
+      const bb = bettedMatchIds.has(b.id) ? 0 : 1;
+      return ba - bb || a.kickoff.localeCompare(b.kickoff);
+    })
     .slice(0, 5);
   const recentBets = slips.slice(0, 5);
 
