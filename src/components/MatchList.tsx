@@ -66,7 +66,7 @@ function OddsChips({ odds }: { odds: OddsTriple }) {
   );
 }
 
-function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
+function MatchRow({ m, odds, betted }: { m: Match; odds?: OddsTriple; betted?: boolean }) {
   const [open, setOpen] = useState(false);
   const isLive = m.status === 'LIVE' || m.status === 'PAUSED';
   const korea = isKoreaMatch(m);
@@ -88,6 +88,7 @@ function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
         }}
       >
         <div style={{ minWidth: 0 }}>
+          {betted && <span className="bet-tag">🎯 베팅한 경기</span>}
           <div>
             {korea && <span title="한국 경기">🇰🇷 </span>}
             {group && <span className="stage-tag">{group}</span>}
@@ -215,17 +216,26 @@ function MatchRow({ m, odds }: { m: Match; odds?: OddsTriple }) {
 export function MatchList({
   matches,
   oddsByMatch,
+  bettedIds,
 }: {
   matches: Match[];
   oddsByMatch?: Record<string, OddsTriple>;
+  /** 우리가 베팅한 경기 id 목록 — 해당 경기에 "베팅한 경기" 배지 표시 */
+  bettedIds?: string[];
 }) {
   if (matches.length === 0) {
     return <p className="muted">표시할 경기가 없습니다.</p>;
   }
+  const betted = new Set(bettedIds ?? []);
   return (
     <div className="card">
       {matches.map((m) => (
-        <MatchRow key={m.id} m={m} odds={oddsByMatch?.[m.id]} />
+        <MatchRow
+          key={m.id}
+          m={m}
+          odds={oddsByMatch?.[m.id]}
+          betted={betted.has(m.id)}
+        />
       ))}
     </div>
   );
