@@ -28,8 +28,21 @@ test('settleLeg OU: 합산 득점 기준선 비교, 정수 동점은 환급(VOID
   assert.equal(settleLeg({ market: 'OU', pick: 'OVER', line: 3 }, { home: 2, away: 2 }), 'WON');
 });
 
-test('combinedOdds: 폴 배당 곱(소수 둘째 반올림)', () => {
-  assert.equal(combinedOdds([{ oddsAtPlacement: 1.85 }, { oddsAtPlacement: 2.1 }]), 3.89);
+test('combinedOdds: 베트맨 적중배당률(셋째자리 절사 후 둘째자리 절상=1자리 올림)', () => {
+  // 1.24×1.67×2.13 = 4.4108 → 4.41 → 4.5 (베트맨 표기와 일치)
+  assert.equal(
+    combinedOdds([
+      { oddsAtPlacement: 1.24 },
+      { oddsAtPlacement: 1.67 },
+      { oddsAtPlacement: 2.13 },
+    ]),
+    4.5,
+  );
+  // 1.85×2.1 = 3.885 → 3.88 → 3.9
+  assert.equal(combinedOdds([{ oddsAtPlacement: 1.85 }, { oddsAtPlacement: 2.1 }]), 3.9);
+  // 1.8×1.5 = 2.7 → 2.7 (정수 1자리는 그대로)
+  assert.equal(combinedOdds([{ oddsAtPlacement: 1.8 }, { oddsAtPlacement: 1.5 }]), 2.7);
+  // 단폴: 1.5 → 1.5
   assert.equal(combinedOdds([{ oddsAtPlacement: 1.5 }]), 1.5);
 });
 

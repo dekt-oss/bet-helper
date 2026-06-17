@@ -104,10 +104,13 @@ export function SlipProvider({ children }: { children: React.ReactNode }) {
     [legs],
   );
 
-  const combined = useMemo(
-    () => Math.round(legs.reduce((p, l) => p * (l.odds || 1), 1) * 100) / 100,
-    [legs],
-  );
+  // 베트맨 적중배당률 규칙: 곱 → 소수점 셋째자리 절사 → 둘째자리에서 절상(1자리).
+  // 예) 1.24×1.67×2.13 = 4.4108 → 4.41 → 4.5 (베트맨 표기와 일치)
+  const combined = useMemo(() => {
+    const product = legs.reduce((p, l) => p * (l.odds || 1), 1);
+    const truncated = Math.floor(product * 100) / 100;
+    return Math.ceil(truncated * 10) / 10;
+  }, [legs]);
 
   const value = useMemo<SlipContextValue>(
     () => ({ legs, toggle, remove, clear, legOf, combined, open, setOpen }),

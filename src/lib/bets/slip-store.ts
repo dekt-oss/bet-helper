@@ -8,7 +8,7 @@ import { randomUUID } from 'crypto';
 import type { BetLeg, BetSlip, Match } from '@/lib/types';
 import { isSupabaseConfigured, getSupabaseServer } from '@/lib/db/supabase';
 import { listBetsSettled } from './store';
-import { combinedOdds, settleSlip, type Score } from './settle';
+import { combinedOdds, betmanRoundOdds, settleSlip, type Score } from './settle';
 
 export type NewLeg = Omit<BetLeg, 'status'>;
 
@@ -66,12 +66,12 @@ function recomputePayout(slip: BetSlip): number | undefined {
   if (slip.status === 'PENDING') return undefined;
   if (slip.status === 'VOID') return slip.stake;
   if (slip.status === 'LOST') return 0;
-  // WON: 적중 폴 배당만 곱한다(환급/대기 폴 제외).
+  // WON: 적중 폴 배당만 곱한다(환급/대기 폴 제외). 베트맨 적중배당률 절상 적용.
   const eff = slip.legs.reduce(
     (p, l) => (l.status === 'WON' ? p * l.oddsAtPlacement : p),
     1,
   );
-  return Math.round(slip.stake * eff);
+  return Math.round(slip.stake * betmanRoundOdds(eff));
 }
 
 /**
