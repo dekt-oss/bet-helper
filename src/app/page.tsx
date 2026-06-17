@@ -60,10 +60,11 @@ export default async function DashboardPage() {
   const live = sortKoreaFirst(
     matches.filter((m) => m.status === 'LIVE' || m.status === 'PAUSED'),
   );
-  // 우리가 베팅한 경기 id 집합(전표 폴 기준) — 다가오는 경기에서 최우선 노출.
+  // 우리가 베팅한 경기 id 집합(전표 폴 기준) — 다가오는 경기에서 최우선 노출 + 배지 표시.
   const bettedMatchIds = new Set(
     slips.flatMap((s) => s.legs.map((l) => l.matchId)),
   );
+  const bettedIds = [...bettedMatchIds];
 
   // 한국 경기를 최우선으로, 나머지는 다가오는 경기로.
   const scheduled = matches.filter((m) => m.status === 'SCHEDULED');
@@ -210,19 +211,19 @@ export default async function DashboardPage() {
       {live.length > 0 && (
         <>
           <h2 style={{ marginTop: 32 }}>🔴 진행중 경기</h2>
-          <MatchList matches={live} oddsByMatch={oddsByMatch} />
+          <MatchList matches={live} oddsByMatch={oddsByMatch} bettedIds={bettedIds} />
         </>
       )}
 
       {koreaUpcoming.length > 0 && (
         <>
           <h2 style={{ marginTop: 32 }}>🇰🇷 한국 경기</h2>
-          <MatchList matches={koreaUpcoming} oddsByMatch={oddsByMatch} />
+          <MatchList matches={koreaUpcoming} oddsByMatch={oddsByMatch} bettedIds={bettedIds} />
         </>
       )}
 
       <h2 style={{ marginTop: 32 }}>다가오는 경기</h2>
-      <MatchList matches={upcoming} oddsByMatch={oddsByMatch} />
+      <MatchList matches={upcoming} oddsByMatch={oddsByMatch} bettedIds={bettedIds} />
     </>
   );
 }
