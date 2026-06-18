@@ -33,12 +33,13 @@ export function SlipPanel() {
   const router = useRouter();
   const okRef = useRef(false);
 
-  // 구매 성공 시 슬립 비우고 목록 갱신.
+  // 구매 성공 시 슬립 비우고 패널 접고 목록 갱신.
   useEffect(() => {
     if (state.ok && !okRef.current) {
       okRef.current = true;
       clear();
       setStake('');
+      setOpen(false);
       router.refresh();
       const t = setTimeout(() => {
         okRef.current = false;
@@ -46,15 +47,15 @@ export function SlipPanel() {
       return () => clearTimeout(t);
     }
     if (!state.ok) okRef.current = false;
-  }, [state, clear, router]);
+  }, [state, clear, router, setOpen]);
 
   const count = legs.length;
   const stakeNum = Number(stake);
   const expected =
     stakeNum > 0 && combined > 1 ? Math.round(stakeNum * combined) : null;
 
-  // 폴이 없고 닫혀 있으면 아무것도 안 보임(단, 방금 구매 성공 메시지는 잠깐 노출).
-  if (count === 0 && !open && !state.ok) {
+  // 닫혀 있으면 FAB 만 보인다(X 로 언제든 접을 수 있게 open 만으로 판단).
+  if (!open) {
     return (
       <button
         type="button"
@@ -62,7 +63,7 @@ export function SlipPanel() {
         onClick={() => setOpen(true)}
         aria-label="구매 슬립 열기"
       >
-        🧾 슬립
+        🧾 슬립{count > 0 && <span className="slip-count">{count}</span>}
       </button>
     );
   }

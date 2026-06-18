@@ -225,14 +225,21 @@ async function _getMarketOdds(): Promise<MarketOdds[]> {
   const [dbRaw, { matches }] = await Promise.all([listMarketOdds(), getMatches()]);
   const db = resolveMatchIds(dbRaw, matches);
   const map = new Map<string, MarketOdds>();
-  for (const o of db) map.set(marketKey(o), o);
+  // DB(베트맨/수동)에 존재하는 (경기, 마켓유형) — 이 유형은 자동 배당으로 보강하지 않는다.
+  const dbTypes = new Set<string>();
+  for (const o of db) {
+    map.set(marketKey(o), o);
+    dbTypes.add(`${o.matchId}::${o.market}`);
+  }
 
   if (isOddsApiConfigured()) {
     try {
       const api = matchOddsToMatches(await fetchWorldCupMarketOdds(matches), matches);
       for (const o of api) {
+        // 베트맨/수동이 이미 그 마켓을 제공하면 자동 배당은 무시(라인 불일치/중복 방지).
+        if (dbTypes.has(`${o.matchId}::${o.market}`)) continue;
         const k = marketKey(o);
-        if (!map.has(k)) map.set(k, o); // DB(실배당)에 없을 때만 보강
+        if (!map.has(k)) map.set(k, o);
       }
     } catch (err) {
       console.warn('[data] The Odds API 마켓(스프레드/토탈) 실패(무시):', err);

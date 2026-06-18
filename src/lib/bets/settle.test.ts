@@ -42,7 +42,8 @@ test('combinedOdds: 베트맨 적중배당률(셋째자리 절사 후 둘째자�
   assert.equal(combinedOdds([{ oddsAtPlacement: 1.85 }, { oddsAtPlacement: 2.1 }]), 3.9);
   // 1.8×1.5 = 2.7 → 2.7 (정수 1자리는 그대로)
   assert.equal(combinedOdds([{ oddsAtPlacement: 1.8 }, { oddsAtPlacement: 1.5 }]), 2.7);
-  // 단폴: 1.5 → 1.5
+  // 단폴: 배당 그대로(절상 안 함) — 2.13 → 2.13, 1.5 → 1.5
+  assert.equal(combinedOdds([{ oddsAtPlacement: 2.13 }]), 2.13);
   assert.equal(combinedOdds([{ oddsAtPlacement: 1.5 }]), 1.5);
 });
 
