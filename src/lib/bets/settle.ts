@@ -13,17 +13,23 @@ export interface Score {
 }
 
 /**
- * 베트맨 적중배당률 규칙으로 총배당을 계산한다.
- *   곱 → 소수점 셋째자리 절사 → 둘째자리에서 절상(올림) → 소수 1자리.
- * 예) 1.24×1.67×2.13 = 4.4108 → 4.41 → 4.5
- *     1.8×1.5 = 2.7 → 2.7
+ * 적중배당률 규칙으로 총배당을 계산한다.
+ *   - 단폴(1경기): 배당 그대로(소수 2자리). 베트맨도 단폴은 게임 배당 그대로.
+ *   - 다폴(2경기+): 곱 → 소수점 셋째자리 절사 → 둘째자리에서 절상(올림) → 소수 1자리.
+ *     예) 1.24×1.67×2.13 = 4.4108 → 4.41 → 4.5
  */
 export function combinedOdds(legs: Pick<BetLeg, 'oddsAtPlacement'>[]): number {
-  const product = legs.reduce((p, l) => p * (l.oddsAtPlacement || 1), 1);
-  return betmanRoundOdds(product);
+  return applyCombinedRule(legs.map((l) => l.oddsAtPlacement || 1));
 }
 
-/** 베트맨 적중배당률 반올림: 소수점 셋째자리 절사 후 둘째자리에서 절상(1자리 올림). */
+/** 배당 목록(곱할 대상)에 적중배당률 규칙 적용. 단폴=그대로, 다폴=베트맨 절상. */
+export function applyCombinedRule(oddsList: number[]): number {
+  if (oddsList.length === 0) return 1;
+  if (oddsList.length === 1) return Math.round(oddsList[0] * 100) / 100;
+  return betmanRoundOdds(oddsList.reduce((p, o) => p * o, 1));
+}
+
+/** 베트맨 적중배당률 반올림(다폴): 소수점 셋째자리 절사 후 둘째자리에서 절상(1자리 올림). */
 export function betmanRoundOdds(odds: number): number {
   const truncated = Math.floor(odds * 100) / 100; // 셋째자리 절사(2자리로 버림)
   return Math.ceil(truncated * 10) / 10; // 둘째자리에서 절상(1자리로 올림)
@@ -100,15 +106,13 @@ export function settleSlip(
   if (legStatuses.every((s) => s === 'VOID')) {
     return { status: 'VOID', payout: slip.stake, legStatuses };
   }
-  // WON(+ 일부 VOID): 적중 폴 배당만 곱한다(환급 폴은 배당 1).
-  // 베트맨 규칙대로 적중배당률을 절상(1자리)한 뒤 구매금액을 곱한다.
-  const effective = slip.legs.reduce(
-    (p, leg, i) => (legStatuses[i] === 'WON' ? p * leg.oddsAtPlacement : p),
-    1,
-  );
+  // WON(+ 일부 VOID): 적중 폴 배당만 모아 적중배당률 규칙 적용(단폴=그대로, 다폴=절상).
+  const wonOdds = slip.legs
+    .filter((_, i) => legStatuses[i] === 'WON')
+    .map((l) => l.oddsAtPlacement);
   return {
     status: 'WON',
-    payout: Math.round(slip.stake * betmanRoundOdds(effective)),
+    payout: Math.round(slip.stake * applyCombinedRule(wonOdds)),
     legStatuses,
   };
 }

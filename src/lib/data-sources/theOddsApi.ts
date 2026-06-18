@@ -116,7 +116,6 @@ function mapEventsToMarketOdds(
 
   const now = new Date().toISOString();
   const out: MarketOdds[] = [];
-  const seen = new Set<string>(); // (matchId,market,line) 중복 방지(여러 북메이커)
 
   for (const e of events) {
     const match = byPair.get(pairKey(e.home_team, e.away_team));
@@ -125,47 +124,48 @@ function mapEventsToMarketOdds(
     const homeName = match ? match.home.name : e.home_team;
     const awayName = match ? match.away.name : e.away_team;
 
+    // 베트맨은 경기당 핸디/언오 기준선이 하나뿐이므로, 여러 북메이커가 서로 다른
+    // 라인을 줘도 경기당 1개(첫 북메이커)만 채택한다(라인 불일치/중복 표시 방지).
+    let hd: MarketOdds | null = null;
+    let ou: MarketOdds | null = null;
     for (const bk of e.bookmakers ?? []) {
       for (const mk of bk.markets ?? []) {
-        if (mk.key === 'spreads') {
+        if (mk.key === 'spreads' && !hd) {
           const homeO = mk.outcomes.find((x) => teamCanon(x.name) === teamCanon(homeName));
           const awayO = mk.outcomes.find((x) => teamCanon(x.name) === teamCanon(awayName));
-          if (!homeO || !awayO || homeO.price <= 1 || awayO.price <= 1) continue;
-          const line = homeO.point ?? null;
-          const dedupe = `${matchId}|HANDICAP|${line ?? ''}`;
-          if (seen.has(dedupe)) continue;
-          seen.add(dedupe);
-          out.push({
-            matchId,
-            market: 'HANDICAP',
-            externalRef,
-            home: homeO.price,
-            away: awayO.price,
-            handicap: line ?? undefined,
-            updatedAt: now,
-            source: 'oddsapi',
-          });
-        } else if (mk.key === 'totals') {
+          if (homeO && awayO && homeO.price > 1 && awayO.price > 1) {
+            hd = {
+              matchId,
+              market: 'HANDICAP',
+              externalRef,
+              home: homeO.price,
+              away: awayO.price,
+              handicap: homeO.point ?? undefined,
+              updatedAt: now,
+              source: 'oddsapi',
+            };
+          }
+        } else if (mk.key === 'totals' && !ou) {
           const overO = mk.outcomes.find((x) => /over/i.test(x.name));
           const underO = mk.outcomes.find((x) => /under/i.test(x.name));
-          if (!overO || !underO || overO.price <= 1 || underO.price <= 1) continue;
-          const line = overO.point ?? underO.point ?? null;
-          const dedupe = `${matchId}|OU|${line ?? ''}`;
-          if (seen.has(dedupe)) continue;
-          seen.add(dedupe);
-          out.push({
-            matchId,
-            market: 'OU',
-            externalRef,
-            line: line ?? undefined,
-            over: overO.price,
-            under: underO.price,
-            updatedAt: now,
-            source: 'oddsapi',
-          });
+          if (overO && underO && overO.price > 1 && underO.price > 1) {
+            ou = {
+              matchId,
+              market: 'OU',
+              externalRef,
+              line: overO.point ?? underO.point ?? undefined,
+              over: overO.price,
+              under: underO.price,
+              updatedAt: now,
+              source: 'oddsapi',
+            };
+          }
         }
       }
+      if (hd && ou) break;
     }
+    if (hd) out.push(hd);
+    if (ou) out.push(ou);
   }
   return out;
 }
