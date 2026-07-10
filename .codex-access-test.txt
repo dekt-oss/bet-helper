@@ -1,3 +1,0 @@
-Codex GitHub connector access test.
-Repository: dekt-oss/bet-helper
-Date: 2026-07-11
